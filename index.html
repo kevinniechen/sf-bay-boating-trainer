@@ -68,18 +68,23 @@
 
 <div id="overlay">
   <div id="menu-main" class="menu">
-    <h1>SF Bay Boating Trainer</h1>
-    <div class="sub">Protector 33 Targa RIB · twin Verado 350s (~50 kn) · a busy October Saturday on the central bay. <b>You're already driving</b> — Q/W ahead, ←/→ steer, Esc hides this menu.</div>
-    <h3>Featured runs</h3>
+    <h1>SF Bay <span>Boating</span></h1>
+    <div class="sub" id="menu-sub">Q / W throttle · ← / → steer · Esc menu</div>
+    <div id="menu-resume" class="mrow">
+      <button id="btn-resume" class="primary">Resume <kbd>Esc</kbd></button>
+      <button id="btn-restart">Restart</button>
+    </div>
     <div id="featured"></div>
-    <h3>Modes</h3>
-    <button id="btn-free" class="primary big">Free Ride — pick any dock, time & weather</button>
-    <button id="btn-scen" class="big">Scenario Mode (graded)</button>
-    <button id="btn-tour" class="big">Route Tours — watch &amp; learn</button>
-    <button id="btn-guide">Chart & Dock Guide</button>
-    <button id="btn-help">Controls & how to</button>
-    <label>Graphics <select class="q-sel"></select></label>
-    <p class="disc">Training aid only. Geography, docks, currents and traffic are approximations — never navigate by this. Use NOAA charts 18649/18653, current tables, and local knowledge.</p>
+    <div class="mrow modes">
+      <button id="btn-free">Free Ride</button>
+      <button id="btn-scen">Scenarios</button>
+      <button id="btn-tour">Route Tours</button>
+    </div>
+    <div class="mlinks">
+      <button id="btn-guide" class="link">Chart</button>
+      <button id="btn-help" class="link">Controls</button>
+      <label class="q-row">Graphics <select class="q-sel"></select></label>
+    </div>
   </div>
   <div id="menu-free" class="menu">
     <h2>Free Ride</h2>
@@ -134,16 +139,6 @@
     <div id="tour-list" class="scen-grid"></div>
     <button class="back">Back</button>
   </div>
-  <div id="menu-pause" class="menu">
-    <h2>Paused</h2>
-    <div id="pause-stats"></div>
-    <label>Graphics <select class="q-sel"></select></label>
-    <button id="btn-resume" class="primary">Resume (Esc)</button>
-    <button id="btn-restart">Restart</button>
-    <button id="btn-pause-scen">Scenarios</button>
-    <button id="btn-pause-help">Controls & how to</button>
-    <button id="btn-tomenu">Main menu</button>
-  </div>
   <div id="menu-help" class="menu wide">
     <h2>Controls & how to drive a twin</h2>
     <div class="cols">
@@ -193,6 +188,7 @@
         </ul>
       </div>
     </div>
+    <p class="disc">Training aid only. Geography, docks, currents and traffic are approximations — never navigate by this. Use NOAA charts 18649/18653, current tables, and local knowledge.</p>
     <button class="back">Back</button>
   </div>
 </div>

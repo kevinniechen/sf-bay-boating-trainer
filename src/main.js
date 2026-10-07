@@ -148,17 +148,17 @@ function hornFrom(v, pattern) {
 // ============================================================================ featured runs & lobby
 // Hand-picked moments on the bay: each sets the place, the light, the weather and the traffic.
 const FEATURED = [
-  { id: 'golden', title: 'Sausalito Golden Hour', sub: 'Sun dropping behind the Headlands, glitter on the water', tag: '18:20 · light air', clock: 18.33, wind: 8, place: [37.8562, -122.4712, 200, 7] },
-  { id: 'sunrise', title: 'Sunrise Under the Bay Bridge', sub: 'First light over the East Bay hills, glassy water', tag: '07:05 · calm', clock: 7.08, wind: 3, tide: 'slackflood', place: [37.7915, -122.3800, 60, 6] },
-  { id: 'bluebird', title: 'Bluebird Day off Tiburon', sub: "Raccoon Strait to Sam's under deep blue skies", tag: '12:30 · breeze', clock: 12.5, wind: 12, place: [37.8640, -122.4520, 330, 9], dest: 'sams' },
-  { id: 'fleetweek', title: 'Fleet Week — Blue Angels', sub: 'Airshow over the Marina Green, Navy ships, hundreds of spectator boats', tag: '15:00 · show box hot', clock: 15.0, wind: 10, traffic: 'fleetweek', place: [37.8237, -122.4505, 172, 1.5] },
-  { id: 'karl', title: 'Karl the Fog at the Gate', sub: 'Foghorns, 300 m visibility, a ship somewhere out there', tag: '09:30 · thick fog', clock: 9.5, wind: 7, fog: 1, place: [37.8140, -122.4620, 285, 6] },
-  { id: 'night', title: 'City Lights at Night', sub: 'Bay Lights, Ferry Building clock, the skyline twinkling', tag: '20:30 · clear night', clock: 20.5, wind: 5, place: [37.8075, -122.3835, 218, 6] },
-  { id: 'smoker', title: 'Max Ebb Smoker off Alcatraz', sub: '22 kn westerly against a 3 kn ebb — steep chop', tag: '15:30 · small craft adv.', clock: 15.5, wind: 22, tide: 'maxebb', place: [37.8230, -122.4150, 270, 14] },
-  { id: 'ayala', title: 'Morning Calm in Ayala Cove', sub: 'Angel Island glassing off, first boats picking up moorings', tag: '08:45 · glassy', clock: 8.75, wind: 3, tide: 'slackflood', place: [37.8712, -122.4372, 160, 4], dest: 'ayala' },
+  { id: 'golden', short: 'Golden Hour · Sausalito', title: 'Sausalito Golden Hour', sub: 'Sun dropping behind the Headlands, glitter on the water', tag: '18:20 · light air', clock: 18.33, wind: 8, place: [37.8562, -122.4712, 200, 7] },
+  { id: 'sunrise', short: 'Sunrise · Bay Bridge', title: 'Sunrise Under the Bay Bridge', sub: 'First light over the East Bay hills, glassy water', tag: '07:05 · calm', clock: 7.08, wind: 3, tide: 'slackflood', place: [37.7915, -122.3800, 60, 6] },
+  { id: 'bluebird', short: 'Bluebird Day · Tiburon', title: 'Bluebird Day off Tiburon', sub: "Raccoon Strait to Sam's under deep blue skies", tag: '12:30 · breeze', clock: 12.5, wind: 12, place: [37.8640, -122.4520, 330, 9], dest: 'sams' },
+  { id: 'fleetweek', short: 'Fleet Week · Blue Angels', title: 'Fleet Week — Blue Angels', sub: 'Airshow over the Marina Green, Navy ships, hundreds of spectator boats', tag: '15:00 · show box hot', clock: 15.0, wind: 10, traffic: 'fleetweek', place: [37.8237, -122.4505, 172, 1.5] },
+  { id: 'karl', short: 'Fog at the Gate', title: 'Karl the Fog at the Gate', sub: 'Foghorns, 300 m visibility, a ship somewhere out there', tag: '09:30 · thick fog', clock: 9.5, wind: 7, fog: 1, place: [37.8140, -122.4620, 285, 6] },
+  { id: 'night', short: 'City Lights', title: 'City Lights at Night', sub: 'Bay Lights, Ferry Building clock, the skyline twinkling', tag: '20:30 · clear night', clock: 20.5, wind: 5, place: [37.8075, -122.3835, 218, 6] },
+  { id: 'smoker', short: 'Max Ebb · Alcatraz', title: 'Max Ebb Smoker off Alcatraz', sub: '22 kn westerly against a 3 kn ebb — steep chop', tag: '15:30 · small craft adv.', clock: 15.5, wind: 22, tide: 'maxebb', place: [37.8230, -122.4150, 270, 14] },
+  { id: 'ayala', short: 'Calm · Ayala Cove', title: 'Morning Calm in Ayala Cove', sub: 'Angel Island glassing off, first boats picking up moorings', tag: '08:45 · glassy', clock: 8.75, wind: 3, tide: 'slackflood', place: [37.8712, -122.4372, 160, 4], dest: 'ayala' },
 ];
 function featuredHTML() {
-  return FEATURED.map(f => `<button class="feat" data-id="${f.id}"><span class="ft">${f.title}</span><span class="fs">${f.sub}</span><span class="fg">${f.tag}</span></button>`).join('');
+  return FEATURED.map(f => `<button class="feat" data-id="${f.id}" title="${f.title} — ${f.sub}"><span class="ft">${f.short}</span><span class="fg">${f.tag}</span></button>`).join('');
 }
 function applyFeatured(f, asLobby = false) {
   runner.stop(); endTour(); setRouteOverlay(null); routeStops = null; setDest(null);
@@ -180,13 +180,14 @@ function startLobby() { applyFeatured(FEATURED[0], true); }
 
 // ============================================================================ menus
 function showMenu(name) {
-  for (const id of ['menu-main', 'menu-free', 'menu-scen', 'menu-pause', 'menu-help', 'menu-tour']) $(id).style.display = 'none';
+  if (name === 'pause') name = 'main';   // one menu everywhere: Esc shows the main menu (+ Resume when in a session)
+  for (const id of ['menu-main', 'menu-free', 'menu-scen', 'menu-help', 'menu-tour']) $(id).style.display = 'none';
   if (name) { $('menu-' + name).style.display = 'flex'; $('overlay').style.display = 'flex'; }
   else $('overlay').style.display = 'none';
   document.body.classList.toggle('lobby', mode === 'menu');
   if (name === 'scen') renderScenarioList();
   if (name === 'tour') renderTourList();
-  if (name === 'pause') renderPause();
+  if (name === 'main') renderPause();
 }
 function buildMenus() {
   $('btn-free').onclick = () => { initAudio(); showMenu('free'); };
@@ -199,7 +200,7 @@ function buildMenus() {
   document.addEventListener('click', (e) => { if (e.target.closest('button')) e.target.closest('button').blur(); });
   document.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') e.target.blur(); });
   $('btn-tour').onclick = () => { initAudio(); showMenu('tour'); };
-  document.querySelectorAll('.back').forEach(b => b.onclick = () => showMenu(mode === 'menu' ? 'main' : 'pause'));
+  document.querySelectorAll('.back').forEach(b => b.onclick = () => showMenu('main'));
   const sel = $('f-start');
   const docked = [['home', 'Pier 40 — your slip'], ['sausalito', 'Sausalito city guest dock'], ['sams', "Sam's Anchor Cafe (Tiburon)"], ['ayala', 'Ayala Cove, Angel Island'], ['p39', 'Pier 39 Marina'], ['p15', 'Pier 1½ (Ferry Building)'], ['horseshoe', 'Horseshoe Cove'], ['schoonmaker', 'Schoonmaker Point (Sausalito)'], ['clippercove', 'Clipper Cove (Treasure Island)']];
   sel.innerHTML = `<optgroup label="Tied up at a dock — engines running, ready to cast off">` + docked.map(([k, n]) => `<option value="dock:${k}">${n}</option>`).join('') + `</optgroup>`
@@ -211,9 +212,6 @@ function buildMenus() {
   document.querySelectorAll('.q-sel').forEach(el => { el.innerHTML = Object.entries(QUALITY).map(([k, q]) => `<option value="${k}">${q.label}</option>`).join(''); el.value = W.qualityName; el.onchange = () => applyQuality(el.value); });
   $('btn-resume').onclick = () => { showMenu(null); paused = false; };
   $('btn-restart').onclick = () => { if (mode === 'scenario' && runner.def) startScenario(runner.def); else if (mode === 'tour' && tour) startTour(tour.route); else showMenu('free'); };
-  $('btn-tomenu').onclick = () => { startLobby(); };
-  $('btn-pause-help').onclick = () => showMenu('help');
-  $('btn-pause-scen').onclick = () => showMenu('scen');
 }
 function renderScenarioList() {
   let best = {};
@@ -225,8 +223,13 @@ function renderScenarioList() {
   document.querySelectorAll('.scen').forEach(b => b.onclick = () => startScenario(SCENARIOS.find(s => s.id === b.dataset.id)));
 }
 function renderPause() {
-  const v = stats.violations.slice(-8).map(x => `<li>${x}</li>`).join('') || '<li class="dim">None — nice.</li>';
-  $('pause-stats').innerHTML = `<div>Distance: <b>${(stats.dist / 1852).toFixed(1)} nm</b> · Damage: <b>${Math.round(player.damage)}%</b> · Slams: ${player.slams}</div><div class="viol"><b>Logbook — rule & seamanship notes:</b><ul>${v}</ul></div>`;
+  // in a session the menu gains Resume/Restart and a one-line logbook; in the lobby it's just the menu
+  const inSession = mode !== 'menu';
+  $('menu-resume').style.display = inSession ? 'flex' : 'none';
+  const what = { free: 'Free Ride', scenario: 'Scenario', tour: 'Route Tour' }[mode] || '';
+  $('menu-sub').innerHTML = inSession
+    ? `${what} paused · ${(stats.dist / 1852).toFixed(1)} nm · damage ${Math.round(player.damage)}%${stats.violations.length ? ` · ${stats.violations.length} logbook notes` : ''}`
+    : 'Q / W throttle · ← / → steer · Esc menu';
 }
 
 function renderTourList() {
@@ -434,12 +437,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (k === 'escape' || k === 'p') {
     if (hud.chartOpen) { closeChart(); paused = false; return; }
-    if (mode === 'menu') { // lobby: Esc hides/shows the menu so you can just drive
-      if ($('overlay').style.display === 'flex' && $('menu-main').style.display !== 'flex') showMenu('main');
-      else showMenu($('overlay').style.display === 'flex' ? null : 'main');
-      return;
-    }
-    if ($('overlay').style.display === 'flex') { showMenu(null); paused = false; } else { paused = true; showMenu('pause'); }
+    const open = $('overlay').style.display === 'flex';
+    if (open && $('menu-main').style.display !== 'flex') { showMenu('main'); return; }   // sub-menu → back to the menu
+    if (mode === 'menu') { showMenu(open ? null : 'main'); return; }                    // lobby: hide/show, keep driving
+    if (open) { showMenu(null); paused = false; } else { paused = true; showMenu('main'); }
     return;
   }
   if (k === 'm' && mode !== 'menu') { if (hud.chartOpen) { closeChart(); paused = false; } else { openChart(player); if (mode === 'scenario') paused = true; } return; }
