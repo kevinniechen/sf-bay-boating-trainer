@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SF Bay Boating Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="loading"><div class="ltitle">SF Bay <span>Boating Trainer</span></div><div class="lbar"><i></i></div><div id="loadmsg">Loading…</div></div>
+
+<div id="hud" style="display:none">
+  <canvas id="compass" width="480" height="34"></canvas>
+  <div id="inst" class="panel"></div>
+  <div id="right">
+    <canvas id="minimap" width="230" height="230"></canvas>
+    <div id="targets" class="panel"></div>
+  </div>
+  <canvas id="engines" width="650" height="196"></canvas>
+  <div id="linesPanel" class="panel"></div>
+  <div id="prep" class="panel"></div>
+  <div id="tourPanel" class="panel"></div>
+  <div id="advisor" class="panel"></div>
+  <div id="radio" class="panel"></div>
+  <div id="coach"></div>
+  <div id="scen-title" class="panel"></div>
+  <div id="scen-timer"></div>
+  <div id="keyhint" style="display:none">Levers: drag knobs or Q/Z (port) W/X (stbd), Shift = both · Helm: ←→ (Shift = fast) or drag the wheel · B bow thruster, , . push bow · H horn · F fenders · L lines · C camera · M chart · G docks · V currents · E binoculars · ` perf · Esc menu</div>
+</div>
+<div id="toasts"></div>
+<div id="perf"></div>
+
+<div id="chart">
+  <div id="chart-top">
+    <b>Chart & Dock Guide</b>
+    <span id="chart-layers">
+      <label><input type="checkbox" data-layer="depth">Depth</label>
+      <label><input type="checkbox" data-layer="current">Currents</label>
+      <label><input type="checkbox" data-layer="wind">Wind</label>
+      <label><input type="checkbox" data-layer="traffic">Live traffic</label>
+      <label><input type="checkbox" data-layer="lanes">Ship lanes & ferry routes</label>
+      <label><input type="checkbox" data-layer="zones">Where the boats are</label>
+      <label><input type="checkbox" data-layer="nowake">No-wake zones</label>
+      <label><input type="checkbox" data-layer="hazards">Hazards & aids</label>
+      <label><input type="checkbox" data-layer="labels">Dock labels</label>
+    </span>
+    <span class="dim">Click a dock name for details · click water = set waypoint · wheel = zoom · drag = pan · M/Esc = close</span>
+  </div>
+  <canvas id="chartcv"></canvas>
+  <div id="chart-legend">
+    <div><i style="background:#f6e7b8"></i>Land</div><div><i style="background:#96c8a0"></i>&lt; 5 ft (mud/shoal)</div><div><i style="background:#a0d2eb"></i>5–12 ft</div><div><i style="background:#bee1f3"></i>12–20 ft</div><div><i style="background:#ddeff8"></i>20–60 ft</div><div><i style="background:#fcfdff;border:1px solid #ccc"></i>&gt; 60 ft</div>
+    <div><i style="background:#1b5e20"></i>Guest dock</div><div><i style="background:#6a1b9a"></i>Dock & dine</div><div><i style="background:#1565c0"></i>Home</div><div><i style="background:#b71c1c"></i>Restricted</div>
+    <div><i style="background:#00c853"></i>Open guest spot</div><div><i style="background:#ff3b30"></i>Ship</div><div><i style="background:#ff9500"></i>Ferry/tour</div><div><i style="background:#fff;border:1px solid #999"></i>Sail</div><div><i style="background:#ffd60a"></i>Power</div><div><i style="background:#5ac8fa"></i>Paddle/swim/kite</div>
+  </div>
+  <div id="chart-readout"></div>
+</div>
+<div id="dockcard" class="panel"></div>
+
+<div id="quiz" class="modal"></div>
+<div id="debrief" class="modal"></div>
+<div id="tourEnd" class="modal"></div>
+
+<div id="overlay">
+  <div id="menu-main" class="menu">
+    <h1>SF Bay Boating Trainer</h1>
+    <div class="sub">Protector 33 Targa RIB · twin Verado 350s (~50 kn) · a busy October Saturday on the central bay. <b>You're already driving</b> — Q/W ahead, ←/→ steer, Esc hides this menu.</div>
+    <h3>Featured runs</h3>
+    <div id="featured"></div>
+    <h3>Modes</h3>
+    <button id="btn-free" class="primary big">Free Ride — pick any dock, time & weather</button>
+    <button id="btn-scen" class="big">Scenario Mode (graded)</button>
+    <button id="btn-tour" class="big">Route Tours — watch &amp; learn</button>
+    <button id="btn-guide">Chart & Dock Guide</button>
+    <button id="btn-help">Controls & how to</button>
+    <label>Graphics <select class="q-sel"></select></label>
+    <p class="disc">Training aid only. Geography, docks, currents and traffic are approximations — never navigate by this. Use NOAA charts 18649/18653, current tables, and local knowledge.</p>
+  </div>
+  <div id="menu-free" class="menu">
+    <h2>Free Ride</h2>
+    <label>Start <select id="f-start"></select></label>
+    <label>Time of day <select id="f-time">
+      <option value="10">10:00 — calm morning, light air</option>
+      <option value="12">12:00 — breeze filling in</option>
+      <option value="13.5" selected>13:30 — typical afternoon westerly</option>
+      <option value="15.5">15:30 — peak wind (small craft advisory)</option>
+      <option value="6.95">06:57 — sunrise</option>
+      <option value="18.6">18:35 — golden hour</option>
+      <option value="20.5">20:30 — night (navigation lights)</option>
+    </select></label>
+    <label>Tide <select id="f-tide">
+      <option value="real">Real cycle (strong ebb building)</option>
+      <option value="maxflood">Max flood (current flowing IN)</option>
+      <option value="maxebb">Max ebb (current flowing OUT)</option>
+      <option value="slackflood">Slack water</option>
+    </select></label>
+    <label>Wind <select id="f-wind">
+      <option value="auto">Auto by time of day (Oct pattern)</option>
+      <option value="5">Light (5 kn)</option>
+      <option value="12">Moderate (12 kn)</option>
+      <option value="18">Fresh (18 kn)</option>
+      <option value="25">Strong (25 kn)</option>
+    </select></label>
+    <label>Traffic <select id="f-traffic">
+      <option value="light">Light (weekday)</option>
+      <option value="typical" selected>Busy October Saturday</option>
+      <option value="insane">Insane (Fleet Week-level)</option>
+      <option value="fleetweek">Fleet Week — Blue Angels airshow + spectator fleet</option>
+    </select></label>
+    <label>The sun moves <select id="f-day">
+      <option value="1">Real time</option>
+      <option value="6" selected>6× — watch a sunset in a few minutes</option>
+      <option value="20">20× — time-lapse</option>
+      <option value="0">Frozen</option>
+    </select></label>
+    <label class="chk"><input type="checkbox" id="f-fog"> Fog</label>
+    <button id="btn-go" class="primary big">Cast off ▶</button>
+    <button class="back">Back</button>
+  </div>
+  <div id="menu-scen" class="menu wide">
+    <h2>Scenarios</h2>
+    <div class="sub">Each starts with a quick rules question, then you drive it. You're graded on what a good skipper would do.</div>
+    <div id="scen-list"></div>
+    <button class="back">Back</button>
+  </div>
+  <div id="menu-tour" class="menu wide">
+    <h2>Route Tours</h2>
+    <div class="sub">Sit back: the autopilot drives the whole route — every docking included — at high speed while narrating what you're passing. Then try it yourself.</div>
+    <div id="tour-list" class="scen-grid"></div>
+    <button class="back">Back</button>
+  </div>
+  <div id="menu-pause" class="menu">
+    <h2>Paused</h2>
+    <div id="pause-stats"></div>
+    <label>Graphics <select class="q-sel"></select></label>
+    <button id="btn-resume" class="primary">Resume (Esc)</button>
+    <button id="btn-restart">Restart</button>
+    <button id="btn-pause-scen">Scenarios</button>
+    <button id="btn-pause-help">Controls & how to</button>
+    <button id="btn-tomenu">Main menu</button>
+  </div>
+  <div id="menu-help" class="menu wide">
+    <h2>Controls & how to drive a twin</h2>
+    <div class="cols">
+      <div>
+        <h3>Engines — one lever per engine (like a real twin binnacle)</h3>
+        <table class="keys">
+          <tr><td></td><th>Port lever</th><th>Starboard lever</th></tr>
+          <tr><td>Push forward (hold)</td><td><kbd>Q</kbd></td><td><kbd>W</kbd></td></tr>
+          <tr><td>Pull back (hold)</td><td><kbd>Z</kbd></td><td><kbd>X</kbd></td></tr>
+        </table>
+        <p>Or drag the lever knobs on the control panel with the mouse. <kbd>Shift</kbd> + one engine's keys moves both levers. From <b>N</b> (center detent, green light) a little travel clicks into gear at idle; further opens the throttle. The lever stops at N — release and press again (or drag past the notch) to go into the other gear.</p>
+        <h3>Helm (hydraulic, 4.4 turns lock-to-lock)</h3>
+        <p><kbd>←</kbd>/<kbd>→</kbd> spin the wheel (<kbd>Shift</kbd> = spin fast) or drag the wheel rim. It doesn't self-center. The boat keeps rotating after you center the wheel — meet it with opposite helm.</p>
+        <h3>Trim</h3>
+        <p><kbd>↑</kbd>/<kbd>↓</kbd> trim the engines up/down (the rocker on the port grip). ~25–30% at speed = bow up and faster; trimmed in for chop and turns; too high = porpoising/ventilation.</p>
+        <h3>Bow thruster</h3>
+        <p><kbd>B</kbd> power on/off · hold <kbd>,</kbd> bow to port · hold <kbd>.</kbd> bow to starboard. Only works below ~2 kn; overheats after ~45 s continuous.</p>
+        <h3>Getting underway (checklist when you start in your slip)</h3>
+        <p><kbd>1</kbd> unsnap cover · <kbd>2</kbd> battery ON · <kbd>3</kbd> kill-switch lanyard · <kbd>4</kbd> trim engines down · <kbd>5</kbd>/<kbd>6</kbd> start port/stbd (lever in N) · <kbd>L</kbd> cast off all lines (or one at a time in the LINES panel)</p>
+        <h3>Docking toolbox</h3>
+        <ul>
+          <li><b>Bump the levers:</b> ease into gear 1–2 s → back to N → coast. Idle in gear is ~5 kn — too fast for a marina.</li>
+          <li><b>Spin in place:</b> port lever ahead (<kbd>Q</kbd>) + starboard lever astern (<kbd>X</kbd>) = bow turns RIGHT. <kbd>Z</kbd>+<kbd>W</kbd> = bow turns LEFT.</li>
+          <li><b>Stop:</b> pull both levers back through N into reverse briefly (<kbd>Z</kbd>+<kbd>X</kbd>), then back to N.</li>
+          <li><b>Wind</b> pushes the high bow downwind when you're slow. <b>Current</b> moves the whole boat — watch COG vs heading (yellow tick on the compass).</li>
+          <li><kbd>F</kbd> fenders · <kbd>L</kbd> lines (when alongside & stopped) · <kbd>G</kbd> show open guest spots</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Seeing & learning</h3>
+        <ul>
+          <li><kbd>7</kbd> 3rd person · <kbd>8</kbd> 1st person helm · <kbd>9</kbd> overhead docking view · <kbd>0</kbd> free orbit (or <kbd>C</kbd> to cycle). Mouse-drag to look; wheel to zoom; <kbd>Y</kbd> north-up in overhead.</li>
+          <li><kbd>E</kbd> (hold) binoculars</li>
+          <li><kbd>M</kbd> chart: depths, currents, ship lanes, ferry routes, where boats congregate, hazards, every dock with details.</li>
+          <li><kbd>V</kbd> current overlay: colored arrows + drifting flecks on the water.</li>
+          <li><kbd>N</kbd> Rules Advisor (who's stand-on, which rule, what to do)</li>
+          <li><kbd>H</kbd> horn: tap = short blast (~1 s), hold 4–6 s = prolonged.</li>
+          <li><kbd>O</kbd> MOB button · <kbd>T</kbd> time ×1/×2/×4 (free ride) · <kbd>K</kbd> mute · <kbd>Esc</kbd> pause</li>
+        </ul>
+        <h3>Sound signals (Inland Rules)</h3>
+        <ul class="small">
+          <li>1 short: I intend to leave you on my port side / overtake on your starboard side</li>
+          <li>2 short: leave you on my starboard side / overtake on your port side</li>
+          <li>3 short: I'm operating astern propulsion (backing)</li>
+          <li>5+ short: DANGER / I doubt your intentions</li>
+          <li>1 prolonged: leaving a dock; blind bend; fog (every 2 min when making way)</li>
+        </ul>
+      </div>
+    </div>
+    <button class="back">Back</button>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
