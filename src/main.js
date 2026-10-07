@@ -1,6 +1,9 @@
 // SF Bay Boating Trainer — main loop, input, camera, menus, free-ride coaching.
 import * as THREE from 'three';
-import { buildGeo, loadDEM, ll, toLL, noWakeZoneAt, shipLaneAt, depthAt, HAZARDS, sdfAt } from './geo.js';
+import { buildGeo, loadDEM, ll, toLL, noWakeZoneAt, shipLaneAt, depthAt, HAZARDS, sdfAt, terrainAt } from './geo.js';
+import { initWakes, updateWakes } from './wake.js';
+import { initCrew, updateCrew, crew, ejectAll } from './crew.js';
+import { explode, updateWreck, clearWreck } from './wreck.js';
 import { startFleetWeek, stopFleetWeek, updateFleetWeek } from './fleetweek.js';
 import { env, buildCurrents, buildWind, updateChop, advanceEnv, advanceClock, setTidePreset, currentAt, windAt, KN, chopAt, tideCurrentFactor, baseWindKn } from './env.js';
 import { buildDocks, indexStructs, SITES, PRACTICE_STARTS, PLAYER_SLIP, nearestSite, GUEST_SPOTS, NAV_AIDS } from './docks.js';
@@ -59,6 +62,15 @@ async function boot() {
   player.m.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   hazeifyScene(player.m.root);
   W.post = new Post(W.renderer);
+  initWakes();
+  initCrew(player, 4);
+  crew.hooks.mob = (p, sw) => {
+    if (player.wrecked) return;   // the wreck message already covers everyone in the water
+    toast(`MAN OVERBOARD — ${p.name} is in the water! Stop, keep them in sight, approach from downwind and stop alongside (within ~4 m, under 2 kn).`, 'alarm', 8000);
+    setDest({ x: sw.x, z: sw.z, name: `${p.name} (MOB)` }); beep(1200, 0.25, 0.25);
+    stats.violations.push(`${p.name} went overboard`);
+  };
+  crew.hooks.recovered = (p) => { toast(`${p.name} is back aboard. Everyone's shaken — take it easy.`, 'ok', 5000); setDest(null); };
   player._ai = traffic.vessels;
   G.player = player;
   initLights();
@@ -151,7 +163,7 @@ const FEATURED = [
   { id: 'golden', short: 'Golden Hour · Sausalito', title: 'Sausalito Golden Hour', sub: 'Sun dropping behind the Headlands, glitter on the water', tag: '18:20 · light air', clock: 18.33, wind: 8, place: [37.8562, -122.4712, 200, 7] },
   { id: 'sunrise', short: 'Sunrise · Bay Bridge', title: 'Sunrise Under the Bay Bridge', sub: 'First light over the East Bay hills, glassy water', tag: '07:05 · calm', clock: 7.08, wind: 3, tide: 'slackflood', place: [37.7915, -122.3800, 60, 6] },
   { id: 'bluebird', short: 'Bluebird Day · Tiburon', title: 'Bluebird Day off Tiburon', sub: "Raccoon Strait to Sam's under deep blue skies", tag: '12:30 · breeze', clock: 12.5, wind: 12, place: [37.8640, -122.4520, 330, 9], dest: 'sams' },
-  { id: 'fleetweek', short: 'Fleet Week · Blue Angels', title: 'Fleet Week — Blue Angels', sub: 'Airshow over the Marina Green, Navy ships, hundreds of spectator boats', tag: '15:00 · show box hot', clock: 15.0, wind: 10, traffic: 'fleetweek', place: [37.8237, -122.4505, 172, 1.5] },
+  { id: 'fleetweek', short: 'Fleet Week · Blue Angels', title: 'Fleet Week — Blue Angels', sub: 'Airshow over the Marina Green, Navy ships, hundreds of spectator boats', tag: '16:00 · show box hot', clock: 16.0, wind: 9, traffic: 'fleetweek', place: [37.8237, -122.4470, 196, 1.5] },
   { id: 'karl', short: 'Fog at the Gate', title: 'Karl the Fog at the Gate', sub: 'Foghorns, 300 m visibility, a ship somewhere out there', tag: '09:30 · thick fog', clock: 9.5, wind: 7, fog: 1, place: [37.8140, -122.4620, 285, 6] },
   { id: 'night', short: 'City Lights', title: 'City Lights at Night', sub: 'Bay Lights, Ferry Building clock, the skyline twinkling', tag: '20:30 · clear night', clock: 20.5, wind: 5, place: [37.8075, -122.3835, 218, 6] },
   { id: 'smoker', short: 'Max Ebb · Alcatraz', title: 'Max Ebb Smoker off Alcatraz', sub: '22 kn westerly against a 3 kn ebb — steep chop', tag: '15:30 · small craft adv.', clock: 15.5, wind: 22, tide: 'maxebb', place: [37.8230, -122.4150, 270, 14] },
@@ -160,13 +172,16 @@ const FEATURED = [
 function featuredHTML() {
   return FEATURED.map(f => `<button class="feat" data-id="${f.id}" title="${f.title} — ${f.sub}"><span class="ft">${f.short}</span><span class="fg">${f.tag}</span></button>`).join('');
 }
+function closeOverlays() { quizState = null; $('quiz').style.display = 'none'; $('debrief').style.display = 'none'; $('scen-title').style.display = 'none'; }
 function applyFeatured(f, asLobby = false) {
-  runner.stop(); endTour(); setRouteOverlay(null); routeStops = null; setDest(null);
+  closeOverlays(); runner.stop(); endTour(); setRouteOverlay(null); routeStops = null; setDest(null);
   G.applyEnv({ clock: f.clock, tide: f.tide || 'real', wind: f.wind, traffic: f.traffic || 'typical', fog: f.fog || 0, daySpeed: +($('f-day')?.value || 6) });
   if (f.fog) { env.fog = 1; env.visibility = 320; }
   prepActive = false; renderPrep();
   readyBoat(); player.fenders = false;
   G.placePlayer(...f.place);
+  clearWreck(); initCrew(player, 4); lastStart = () => applyFeatured(f, asLobby);
+  for (const v of traffic.vessels) if (v.name === 'Spectator' && Math.hypot(v.x - player.x, v.z - player.z) < 60) v.remove();   // clear your spot in the crowd
   if (f.dest) setDest(SITES.find(x => x.id === f.dest));
   camMode = 'chase'; camYaw = 0; camPitch = 0.12; camDist = 24; camSnap = true;
   stats.dist = 0; stats.violations = [];
@@ -304,9 +319,11 @@ function driveRoute(route) {
   setDest(routeStops[0]);
 }
 
+let lastStart = null;
 function startFree(o) {
   runner.stop(); endTour(); setRouteOverlay(null); routeStops = null;
-  mode = 'free';
+  mode = 'free'; closeOverlays();
+  clearWreck(); lastStart = () => startFree(o);
   G.applyEnv({ clock: o.clock, tide: o.tide, wind: o.wind === 'auto' ? undefined : +o.wind, traffic: o.traffic, fog: o.fog ? 1 : 0, daySpeed: +($('f-day')?.value || 6) });
   document.body.classList.remove('lobby');
   if (o.fog) { env.fog = 1; env.visibility = 300; }
@@ -326,6 +343,7 @@ function startFree(o) {
   if (o.start !== 'slip' && !o.start.startsWith('dock:')) { prepActive = false; renderPrep(); }
   stats.dist = 0; stats.violations = [];
   W.zone.visible = false;
+  initCrew(player, 4);
   showMenu(null); paused = false;
 }
 // Tied up alongside (or in the slip) with the boat ready to go: cover off, battery on, engines
@@ -474,7 +492,7 @@ window.addEventListener('keydown', (e) => {
     case '`': case 'f3': perf.show = !perf.show; $('perf').style.display = perf.show ? 'block' : 'none'; break;
     case 'k': setMuted(!!(audio_muted = !audio_muted)); break;
     case 'o': if (mode === 'scenario') runner.def?.onKey?.(G, runner, 'o'); else { toast('MOB button: position marked', 'warn'); setDest({ x: player.x, z: player.z, name: 'MOB' }); } break;
-    case 'r': if (mode === 'scenario' && runner.def) startScenario(runner.def); break;
+    case 'r': if (mode === 'scenario' && runner.def) startScenario(runner.def); else if (player.wrecked && lastStart) lastStart(); break;
   }
 });
 let audio_muted = false;
@@ -674,6 +692,26 @@ function updatePrep(dt) {
 // ============================================================================ events → feedback
 function handleEvents() {
   for (const ev of player.events) {
+    if (ev.type === 'impact' && !player.wrecked) {
+      const o = ev.obj, isVessel = ev.kind === 'vessel' && o;
+      const big = isVessel && (o.cat === 'ship' || o.len > 25);
+      const fatal = isVessel ? ev.impact >= (big ? 7 : 11) : ev.impact >= 8 && ev.kind !== 'buoy';
+      if (isVessel && !fatal && o.len < 15 && !o.human && !o.scripted && ev.impact >= 5) {
+        explode(o.x, o.z, o.vx || 0, o.vz || 0, ['#f4f4f0', '#e8e4da', '#1f3a5f', '#30343a', '#c9c2b2'], o.len, false);
+        toast(`You destroyed ${o.name || 'a boat'} at ${(ev.impact / KN).toFixed(0)} kn!`, 'alarm', 5000); stats.violations.push(`Destroyed ${o.name || 'a boat'}`); o.remove();
+      }
+      if (fatal) {
+        explode(player.x, player.z, player.vx, player.vz, ['#f3f3f0', '#151c3d', '#151c3d', '#15181b', '#e6dcc6', '#9ba3aa'], 10.3, true);
+        player.wrecked = true;
+        ejectAll(player, 5 + ev.impact * 0.4); player.m.body.visible = false; player.vx *= 0.15; player.vz *= 0.15; player.r = 0;
+        player.engines.forEach(e => { e.failed = true; e.running = false; });
+        toast(`BOAT DESTROYED — hit ${isVessel ? (o.name || 'a vessel') : ev.kind} at ${(ev.impact / KN).toFixed(0)} kn. Everyone's in the water. Press R to try again.`, 'alarm', 12000);
+        stats.violations.push(`Destroyed the boat (${ev.kind}, ${(ev.impact / KN).toFixed(0)} kn)`);
+        continue;
+      }
+      if (ev.impact >= 4 && Math.random() < 0.35) { const i = Math.random() < 0.5 ? 0 : 1; if (!player.engines[i].failed) { player.engines[i].failed = true; toast(`${i ? 'Starboard' : 'Port'} engine knocked out by the impact!`, 'alarm', 5000); } }
+    }
+    if (ev.type === 'impact' && player.wrecked) continue;
     if (ev.type === 'impact') {
       if (ev.sev === 'touch' && ev.fenders) squeak(Math.min(1, ev.impact * 3));
       else if (ev.sev === 'touch') crunch(0.15);
@@ -825,7 +863,7 @@ function updateCamera(dt) {
     const want = new THREE.Vector3(p.x - Math.sin(yaw) * Math.cos(pitch) * d, 2 + Math.sin(pitch) * d, p.z + Math.cos(yaw) * Math.cos(pitch) * d);
     if (camMode === 'chase' && !camSnap && mode !== 'tour') cam.position.lerp(want, 1 - Math.exp(-dt * 4)); else cam.position.copy(want);
     camSnap = false;
-    cam.position.y = Math.max(cam.position.y, 1.5);
+    cam.position.y = Math.max(cam.position.y, 1.5, terrainAt(cam.position.x, cam.position.z) + 3);
     cam.up.set(0, 1, 0); cam.lookAt(target);
   } else if (camMode === 'top') {
     cam.position.set(p.x, topAlt, p.z + 0.001);
@@ -884,6 +922,8 @@ function frame(now) {
   updateCamera(rdt);
   if (window.__camLook) { const L = window.__camLook(); if (L) { W.camera.fov = L.fov || W.camera.fov; W.camera.updateProjectionMatrix(); W.camera.lookAt(L.x, L.y, L.z); } }   // debug/screenshot hook
   if (!paused && !hud.chartOpen) updateFleetWeek(active ? rdt * timeScale : rdt, W.camera.position, _camR.set(1, 0, 0).applyQuaternion(W.camera.quaternion));
+  updateWakes(player, traffic.vessels, W.camera.position);
+  if (!paused && !hud.chartOpen) { updateCrew(active || mode === 'tour' ? rdt * (active ? timeScale : 1) : 0, player, { camMode }); updateWreck(rdt); }
   updateWorld(rdt, player, {});
   arrowT -= rdt;
   if (arrowT <= 0) { arrowT = 0.25; updateCurrentArrows(player.x, player.z, showCurrents && mode !== 'menu'); }

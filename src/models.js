@@ -155,7 +155,8 @@ export function buildPlayerBoat() {
   gb.box(HB - 0.25, 0.06, 6.2, '#e8e5dc', 0, 0.62, 2.0);
   for (const sgn of [-1, 1]) gb.box(0.22, 0.5, 6.2, WHITE, sgn * (HB / 2 - 0.12), 0.88, 2.0);
   // ---- targa wheelhouse
-  const cz0 = -1.45, cz1 = 1.25, cw = 2.28;            // cabin front / roof aft edge, width
+  const cz0 = -1.45, cz1 = 1.25, cw = 2.28;
+  const glass = new GB();                                // windscreen & side glass: a separate see-through mesh            // cabin front / roof aft edge, width
   gb.box(1.95, 0.62, 1.45, WHITE, 0, 1.05, -2.15);      // forward cabin trunk (cuddy below)
   gb.quad([-0.97, 1.36, -2.88], [0.97, 1.36, -2.88], [1.1, 1.48, cz0], [-1.1, 1.48, cz0], WHITE); // trunk top, sloping to the bow
   gb.box(1.1, 0.03, 0.55, GLASS, 0, 1.46, -2.3, 0, 0.06);                                       // forward hatch
@@ -164,7 +165,7 @@ export function buildPlayerBoat() {
     gb.box(0.09, 0.07, 2.6, NAVY, sgn * (cw / 2 + 0.01), 1.34, cz0 + 1.25);          // navy swoosh
     gb.box(0.09, 0.03, 2.2, '#9aa3ad', sgn * (cw / 2 + 0.012), 1.25, cz0 + 1.1);
     // side glass between pillars
-    gb.quad([sgn * cw / 2, 1.47, cz0 + 0.15], [sgn * cw / 2, 1.47, cz0 + 2.0], [sgn * (cw / 2 - 0.12), 2.18, cz0 + 1.95], [sgn * (cw / 2 - 0.12), 2.18, cz0 + 0.55], GLASS);
+    glass.quad([sgn * cw / 2, 1.47, cz0 + 0.15], [sgn * cw / 2, 1.47, cz0 + 2.0], [sgn * (cw / 2 - 0.12), 2.18, cz0 + 1.95], [sgn * (cw / 2 - 0.12), 2.18, cz0 + 0.55], GLASS);
     // A-pillar, B-pillar and the thick aft targa leg
     seg(gb, [sgn * cw / 2, 1.47, cz0 + 0.02], [sgn * (cw / 2 - 0.12), 2.24, cz0 + 0.5], 0.05, WHITE, 6);
     seg(gb, [sgn * cw / 2, 1.47, cz0 + 2.02], [sgn * (cw / 2 - 0.12), 2.24, cz0 + 1.98], 0.045, WHITE, 6);
@@ -172,7 +173,7 @@ export function buildPlayerBoat() {
     gb.quad([sgn * (cw / 2 - 0.16), 0.86, 0.95], [sgn * (cw / 2 - 0.16), 2.26, 0.75], [sgn * (cw / 2 - 0.26), 2.26, cz1], [sgn * (cw / 2 - 0.16), 0.86, cz1 + 0.05], '#e3e2dc');
   }
   // raked windscreen (three panes) and its frame
-  gb.quad([-cw / 2, 1.47, cz0], [cw / 2, 1.47, cz0], [cw / 2 - 0.12, 2.2, cz0 + 0.5], [-cw / 2 + 0.12, 2.2, cz0 + 0.5], GLASS);
+  glass.quad([-cw / 2, 1.47, cz0], [cw / 2, 1.47, cz0], [cw / 2 - 0.12, 2.2, cz0 + 0.5], [-cw / 2 + 0.12, 2.2, cz0 + 0.5], GLASS);
   for (const x of [-0.38, 0.38]) seg(gb, [x, 1.47, cz0 - 0.01], [x * 0.95, 2.2, cz0 + 0.49], 0.022, WHITE, 5);
   // hardtop roof with drip edge
   gb.box(cw + 0.06, 0.1, cz1 - cz0 - 0.3, WHITE, 0, 2.29, (cz0 + cz1) / 2 + 0.15);
@@ -215,6 +216,8 @@ export function buildPlayerBoat() {
   gb.box(0.2, 0.1, 0.55, '#9aa1a8', 0, st[13].top + 0.32, -4.75);   // anchor roller
   const hullMesh = new THREE.Mesh(gb.build(), MAT.vcDouble);
   sunk.add(hullMesh);
+  const glassMesh = new THREE.Mesh(glass.build(), new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.3, side: THREE.DoubleSide, depthWrite: false }));
+  glassMesh.renderOrder = 4; sunk.add(glassMesh);
   // ---- decals: PROTECTOR on the aft tubes, CRAZY 8 + logo on the cabin sides
   for (const sgn of [-1, 1]) {
     const tq = st[3];
@@ -286,7 +289,7 @@ export function buildPlayerBoat() {
     { x: -0.2, y: 3.05, z: 1.05, color: 0xffffff, sector: 'all' },
   ];
   // first-person eye: standing at the starboard helm, under the hardtop
-  return { root, body, engines, wheel, levers, fenders, cover, navLights, length: L, beam: B, helmEye: [0.45, 1.8, 0.15] };
+  return { root, body, engines, wheel, levers, fenders, cover, navLights, length: L, beam: B, helmEye: [0.45, 1.68, 0.2] };
 }
 
 // ---------------------------------------------------------------- AI vessel models

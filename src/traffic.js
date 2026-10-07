@@ -679,7 +679,7 @@ function move(v, dt) {
     const kn = v.speed / KN;
     const energy = v.speed * v.len * (v.cat === 'ship' ? 0.35 : v.type === 'ferry' ? 1.4 : 1);
     const sz2 = Math.min(8, 0.8 + v.len * 0.03 + kn * 0.06), life = Math.min(70, 6 + v.len * 0.25 + kn);
-    for (const side of [-1, 1]) emitFoam(sx + s.x * side * v.beam * 0.4, sz + s.z * side * v.beam * 0.4, s.x * side * v.speed * 0.2, s.z * side * v.speed * 0.2, sz2, life, energy);
+    for (const side of [-1, 1]) emitFoam(sx + s.x * side * v.beam * 0.4, sz + s.z * side * v.beam * 0.4, s.x * side * v.speed * 0.2, s.z * side * v.speed * 0.2, v._trail ? 0 : sz2, life, energy);
   }
 }
 

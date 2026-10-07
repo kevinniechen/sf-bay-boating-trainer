@@ -63,8 +63,20 @@ export class Post {
           // analytic sun glow + lens ghosts, gated by how bright the sun spot really is (free occlusion test)
           if (uSun.z > 0.0) {
             vec2 d = (vUv - uSun.xy) * vec2(uAspect, 1.0);
-            float vis = clamp(dot(texture2D(tBloom, uSun.xy).rgb, vec3(0.33)) * 0.6, 0.0, 1.0) * uSun.z;
-            hdr += uSunCol * (0.06 / (dot(d, d) * 40.0 + 0.06)) * vis * 0.35;
+            bool onScreen = all(greaterThan(uSun.xy, vec2(0.0))) && all(lessThan(uSun.xy, vec2(1.0)));
+            float vis = (onScreen ? clamp(dot(texture2D(tBloom, uSun.xy).rgb, vec3(0.33)) * 0.6, 0.0, 1.0) : 0.55) * uSun.z;
+            // god rays: march from this pixel toward the sun through the bright-pass (sky gaps between
+            // hills, smoke, rigging) — works even with the sun just off-screen
+            vec2 stepv = (uSun.xy - vUv) / 28.0; vec2 sp = vUv; float decay = 1.0, rays = 0.0;
+            for (int i = 0; i < 28; i++) { sp += stepv; vec2 cs = clamp(sp, 0.001, 0.999); rays += dot(texture2D(tBloom, cs).rgb, vec3(0.33)) * decay; decay *= 0.95; }
+            float rlen = length(d);
+            hdr += uSunCol * rays * 0.012 * uSun.z * smoothstep(1.6, 0.0, rlen);
+            // starburst (6 diffraction spikes) + hot core + a veil of glare over the whole frame
+            float ang = atan(d.y, d.x);
+            float spikes = pow(abs(cos(ang * 3.0 + 0.3)), 60.0) + 0.6 * pow(abs(cos(ang * 3.0 + 1.35)), 90.0);
+            hdr += uSunCol * spikes * exp(-rlen * 9.0) * vis * 1.4;
+            hdr += uSunCol * (0.06 / (dot(d, d) * 40.0 + 0.06)) * vis * 0.55;
+            hdr += uSunCol * exp(-rlen * 1.6) * vis * 0.07;
             vec2 axis = vec2(0.5) - uSun.xy;
             for (int i = 1; i <= 3; i++) {
               vec2 gp = uSun.xy + axis * (0.55 * float(i));
@@ -77,7 +89,7 @@ export class Post {
           // filmic split-tone: cool shadows, warm (October) highlights, a touch more saturation
           float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
           c += mix(vec3(-0.010, 0.0, 0.016), vec3(0.020, 0.010, -0.018) * uWarm, smoothstep(0.15, 0.85, l));
-          c = mix(vec3(l), c, 1.08);
+          c = mix(vec3(l), c, 1.14);
           c = c * c * (3.0 - 2.0 * c) * 0.18 + c * 0.82;     // gentle S-curve
           vec2 v = vUv - 0.5; c *= 1.0 - uVig * dot(v, v) * 1.6;
           gl_FragColor = vec4(pToSRGB(clamp(c, 0.0, 1.0)), 1.0); }`,

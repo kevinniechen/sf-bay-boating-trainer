@@ -57,6 +57,7 @@ export class PlayerBoat {
   }
   reset(x, z, headingDeg) {
     this.x = x; this.z = z; this.h = headingDeg * D2R;
+    this.wrecked = false; if (this.m) this.m.body.visible = true;
     this.vx = 0; this.vz = 0; this.r = 0;
     // lever: -1 (full astern) .. 0 (neutral detent) .. +1 (full ahead). Gear & throttle derive from it.
     this.engines = [0, 1].map(() => ({ lever: 0, gear: 0, thr: 0, thrust: 0, rpm: 650, failed: false, running: true, tilt: 0, hot: 0, detent: null }));
@@ -259,10 +260,13 @@ export class PlayerBoat {
     const f2 = this.fwd, s2 = this.right;
     this.vx = f2.x * this.u + s2.x * this.v + cur.x;
     this.vz = f2.z * this.u + s2.z * this.v + cur.z;
-    this.x += this.vx * dt; this.z += this.vz * dt;
-
+    // continuous-ish collision: sub-step the move so a 50 kn boat can't tunnel through a kayak or a piling
     this.scrape *= Math.exp(-dt * 8);
-    this.collide(dt);
+    const nSub = Math.max(1, Math.ceil(this.speed * dt / 0.3));
+    for (let k = 0; k < nSub; k++) {
+      this.x += this.vx * dt / nSub; this.z += this.vz * dt / nSub;
+      this.collide(dt / nSub);
+    }
     this.checkDepth(dt);
     this.visuals(dt, this.u, chop);
     this.wake(dt, this.u);
@@ -371,6 +375,12 @@ export class PlayerBoat {
     const vpx = this.vx + this.r * px - ovx, vpz = this.vz + this.r * pz - ovz;
     const vn = vpx * nx + vpz * nz;
     this.contactNow = true;
+    // the other boat gets shoved too (momentum shared by mass) — nobody passes through anybody
+    if (kind === 'vessel' && obj && !obj.scripted && obj.cat !== 'ship') {
+      const mo = Math.max(150, obj.len * obj.len * obj.len * 4.5), share = MASS / (MASS + mo);
+      obj.x -= nx * depth * share * 2; obj.z -= nz * depth * share * 2;
+      if (vn < 0) { obj.speed *= 0.6; obj.h += (Math.random() - 0.5) * Math.min(0.6, -vn * share * 0.2); }
+    }
     if (vn >= 0) return;
     const e = this.fenders ? 0.12 : 0.28;
     const pn = px * nx + pz * nz;
@@ -481,9 +491,9 @@ export class PlayerBoat {
     const size = kn < 12 ? 0.3 + kn * 0.03 : 1.2 + Math.min(4, kn * 0.12);
     const life = kn < 12 ? 4 + kn * 0.6 : 8 + Math.min(40, kn * 1.2);
     const energy = sp * 10.7 * (kn > 12 && kn < 22 ? 1.6 : 1);
-    for (const side of [-1, 1]) emitFoam(sx + s.x * side * 1.1, sz + s.z * side * 1.1, s.x * side * spread, s.z * side * spread, size, life, energy);
-    if (kn > 10) emitFoam(sx, sz, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, size * 1.3, life * 0.6, 0);
-    if (kn > 20) for (const side of [-1, 1]) emitFoam(this.x + f.x * 1 + s.x * side * 1.7, this.z + f.z * 1 + s.z * side * 1.7, s.x * side * 3, s.z * side * 3, 1.5, 3, 0);
+    // the visible wake is the procedural ribbon (wake.js); these size-0 emissions only feed wake-crossing physics
+    for (const side of [-1, 1]) emitFoam(sx + s.x * side * 1.1, sz + s.z * side * 1.1, s.x * side * spread, s.z * side * spread, 0, life, energy);
+    if (kn > 20 && Math.random() < 0.5) for (const side of [-1, 1]) emitFoam(this.x + f.x * 2 + s.x * side * 1.7, this.z + f.z * 2 + s.z * side * 1.7, s.x * side * 5, s.z * side * 5, 0.5, 0.7, 0);   // bow spray sheets
   }
 
   // detect being alongside a float/pier so lines can be secured

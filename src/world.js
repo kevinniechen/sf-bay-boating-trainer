@@ -213,8 +213,8 @@ void main() {
   float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
   col = mix(col, mix(vec3(lum), col, 1.5) * vec3(0.78, 0.92, 1.15), dayK * smoothstep(0.02, 0.5, direction.y));
   // clear October blue: pale at the horizon, deep cobalt overhead
-  vec3 grad = mix(vec3(0.56, 0.71, 0.89), vec3(0.11, 0.30, 0.78), pow(smoothstep(0.0, 0.7, max(direction.y, 0.0)), 0.6)) * uExposure * 1.3;
-  col = mix(col, grad, dayK * 0.72 * smoothstep(0.0, 0.07, direction.y) * (1.0 - uFog));
+  vec3 grad = mix(vec3(0.52, 0.70, 0.92), vec3(0.07, 0.25, 0.76), pow(smoothstep(0.0, 0.7, max(direction.y, 0.0)), 0.55)) * uExposure * 1.3;
+  col = mix(col, grad, dayK * 0.84 * smoothstep(0.0, 0.07, direction.y) * (1.0 - uFog));
   // ---- twilight: warm glow on the horizon toward the sun, pink "Belt of Venus" over the earth's shadow opposite
   vec2 hd = normalize(direction.xz + 1e-5), sd2 = normalize(vSunDirection.xz + 1e-5);
   float toward = dot(hd, sd2) * 0.5 + 0.5;
@@ -228,6 +228,8 @@ void main() {
   // ---- night: deep navy gradient, sodium glow of the city on the horizon, twinkling stars
   vec3 nightC = mix(vec3(0.020, 0.030, 0.065), vec3(0.004, 0.007, 0.020), smoothstep(0.0, 0.6, el)) + vec3(0.09, 0.05, 0.025) * exp(-el * 14.0);
   col = max(col, nightC * uNight * uExposure * 2.0);
+  // the sun: a blinding core + corona the bloom/rays can feed on
+  col += vec3(1.0, 0.96, 0.88) * (pow(max(cosTheta, 0.0), 2600.0) * 14.0 + pow(max(cosTheta, 0.0), 260.0) * 0.9) * smoothstep(-0.02, 0.06, sunAlt) * uExposure * (1.0 - uFog);
   if (uNight > 0.0 && direction.y > 0.03) {
     vec3 q = floor(direction * 520.0); float hs = h3(q);
     float st = step(0.9975, hs) * smoothstep(0.03, 0.35, direction.y);
@@ -718,6 +720,7 @@ function buildOSMBuildings() {
       const tris = THREE.ShapeUtils.triangulateShape(pts.map(p => new THREE.Vector2(p.x, p.z)), []);
       for (const t of tris) for (const k of [t[0], t[2], t[1]]) { ch.p.push(pts[k].x, top, pts[k].z); ch.n.push(0, 1, 0); ch.c.push(rc.r, rc.g, rc.b); ch.u.push(-1, -1, 0); }
     }
+    if (h > 45) (W.tallBuildings || (W.tallBuildings = [])).push({ i: count, x: cx, z: cz, h, top });
     if (kind === 5 || h > 55) NL.push([cx, top + 2, cz, 1, 0.08, 0.05, 2]);                // red aviation beacon (blinks)
     else if (count % 4 === 0) NL.push([pts[0].x, base + 6, pts[0].z, 1.0, 0.72, 0.42, 1]);   // street / porch light
     count++;

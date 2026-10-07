@@ -326,14 +326,33 @@ export function jetAudio(level, cutoff, pan, rumble = 0.5) {
     src.connect(lp); lp.connect(lp2); lp2.connect(g);
     src.connect(cr); cr.connect(crG); crG.connect(g);
     src.connect(lo); lo.connect(loG); loG.connect(p);
-    g.connect(p); p.connect(audio.master); src.start();
-    jet = { lp, lp2, crG, loG, g, p };
+    // jets get their own bus (not through the boat mix): a close pass is ~120 dB and should dominate
+    const bus = ctx.createGain(); bus.gain.value = audio.on ? 1 : 0;
+    const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -3; lim.ratio.value = 6; lim.attack.value = 0.003; lim.release.value = 0.2;
+    g.connect(p); p.connect(bus); bus.connect(lim); lim.connect(ctx.destination); src.start();
+    jet = { lp, lp2, crG, loG, g, p, bus };
   }
-  const L = Math.min(1.2, level);
-  jet.g.gain.setTargetAtTime(L * 0.9, t, 0.08);
-  jet.loG.gain.setTargetAtTime(L * rumble * 2.2, t, 0.1);
+  const L = Math.min(2.2, level);
+  jet.bus.gain.setTargetAtTime(audio.on ? 1 : 0, t, 0.05);
+  jet.g.gain.setTargetAtTime(Math.min(1.6, L * 1.1), t, 0.06);
+  jet.loG.gain.setTargetAtTime(Math.min(2.5, L * rumble * 2.6), t, 0.08);
+  // a close pass drowns out your own engines and the bay (ducking the boat mix)
+  if (audio.master && audio.on) audio.master.gain.setTargetAtTime(0.6 * (1 - 0.75 * Math.min(1, L / 1.4)), t, 0.12);
   jet.crG.gain.setTargetAtTime(L * Math.min(1, cutoff / 4000) * 0.35, t, 0.08);
   jet.lp.frequency.setTargetAtTime(Math.max(120, cutoff), t, 0.08);
   jet.lp2.frequency.setTargetAtTime(Math.max(120, cutoff * 1.3), t, 0.08);
   jet.p.pan.setTargetAtTime(Math.max(-0.9, Math.min(0.9, pan)), t, 0.1);
+}
+
+// ---------------------------------------------------------------- explosion: a sub thump + a ripping noise burst + debris crackle
+export function boom(v = 1) {
+  if (!audio.ctx) return;
+  const ctx = audio.ctx, t = ctx.currentTime;
+  const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(28, t + 1.2);
+  const og = ctx.createGain(); og.gain.setValueAtTime(0, t); og.gain.linearRampToValueAtTime(1.6 * v, t + 0.02); og.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+  o.connect(og); og.connect(audio.master); o.start(t); o.stop(t + 1.7);
+  const n = ctx.createBufferSource(); n.buffer = noise(ctx);
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(5000, t); lp.frequency.exponentialRampToValueAtTime(180, t + 2.2);
+  const ng = ctx.createGain(); ng.gain.setValueAtTime(0, t); ng.gain.linearRampToValueAtTime(1.3 * v, t + 0.01); ng.gain.exponentialRampToValueAtTime(0.001, t + 2.6);
+  n.connect(lp); lp.connect(ng); ng.connect(audio.master); n.start(t); n.stop(t + 2.7);
 }

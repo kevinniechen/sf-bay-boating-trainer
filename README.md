@@ -161,8 +161,21 @@ The UI is styled after simulators such as Arma 3 and Euro Truck Simulator 2: fla
   - The city's windows light up and the Bay Lights LED sculpture ripples across the west span's cables.
   - Both bridges' deck lamps are on, and the towers' red aviation beacons blink.
   - Every light, including the boats' nav lights, throws a shimmering streak across the water.
+- **Crew and passengers:** a captain and four passengers, each with a personality (brave, queasy, curious, social, clumsy). None of their behavior is scripted moment by moment; it comes from a few overlapping systems:
+  - **Body:** they feel the boat's real motion: surge, cornering G, heel and pitch, and vertical slams. A crash is just a very large one-frame change in velocity, so it throws them naturally.
+  - **Grip and balance:** how hard a push a person can resist depends on posture (standing, holding a rail, seated). Too much push and they slide, stumble or fall.
+  - **Drives:** fear, nausea, thrill, boredom and fatigue build up from what they feel and see, and fear spreads between nearby people.
+  - **Perception:** they notice landmarks, tall buildings, nearby boats, jets and the sunset, remember what they've already seen, and look at things with their head tilted to the real height.
+  - **Choices:** a utility system picks between wandering, looking, pointing (which makes others look), chatting, sitting, holding on, being sick over the rail, and cheering.
+  - **Results:** a hard turn at speed can send someone sliding over the low cockpit gunwale. That raises a man-overboard alarm, and you can stop alongside to pick them up.
+- **Collisions:** the boat's motion is sub-stepped so it can't tunnel through small boats or pilings, and smaller boats you hit get shoved aside.
+  - A hard impact can knock out an engine.
+  - A violent one (about 15 kn into land or a pier, or a big ship) destroys the boat: a fireball, debris that floats and then sinks, and everyone ends up in the water. Press `R` to try again.
+  - Ramming a small boat hard breaks it apart.
+- **Wakes:** a procedural wake drawn on the water surface follows the swell. It has a frothy prop wash that heals into aerated turquoise, plus the two Kelvin wave arms (about 19.5° wide at slow speed, narrower on plane). The player and the six nearest moving vessels get one.
 - **Fleet Week:**
-  - **Aircraft:** six Blue Angels F/A-18E/F Super Hornets plus Fat Albert, their C-130J. They fly the Delta pass, Diamond 360, sneak pass, opposing knife-edge, Diamond loop, Delta breakout, and a Fat Albert low pass.
+  - **Aircraft:** six Blue Angels F/A-18E/F Super Hornets plus Fat Albert, their C-130J. The show opens within seconds, and the Solos perform while the Diamond repositions. The routine: Delta pass, sneak pass (with a transonic vapor cone), Diamond roll, opposing knife-edge, Double Farvel, minimum-radius turn, Diamond loop, Calypso pass, line-abreast loop, Fortus, echelon parade, opposing aileron rolls, Diamond 360, Fat Albert, Delta loop and Delta breakout.
+  - **Sound:** the jets play on their own audio bus at real-world loudness, and a close pass drowns out your engines.
   - **Air show detail:** aircraft bank and pitch to follow their flight paths, and smoke trails drift downwind. Jet noise arrives with the speed-of-sound delay, Doppler shift and distance muffling.
   - **The water:** a USCG safety zone is marked with yellow buoys and patrolled. An amphibious assault ship, a destroyer and a national security cutter lie at anchor, and about 240 spectator boats pack the front row.
 

@@ -120,48 +120,69 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const E = V(1, 0, 0), Wst = V(-1, 0, 0);
 const DELTA = [[0, 0, 0], [9, -1, 9], [-9, -1, 9], [0, -2, 18], [18, -2, 18], [-18, -2, 18]];
 const DIAMOND = [[0, 0, 0], [8, -1, 8], [-8, -1, 8], [0, -2, 16]];
-
-// Each maneuver: groups (each = a path + formation + speed + roll(τ)), smoke(τ, local pos), call-outs.
+const LINE4 = [[-24, 0, 0], [-8, 0, 0], [8, 0, 0], [24, 0, 0]];
+const ECHELON = [0, 1, 2, 3, 4, 5].map(i => [i * 9, -i * 0.9, i * 9]);
+const IN = 3000;                                   // approach/exit leg length (m)
+const ramp = (x, a, b) => Math.max(0, Math.min(1, (x - a) / (b - a)));
+const sm = (t) => t * t * (3 - 2 * t);
+// Jet assignment like the real team: #1–#4 the Diamond, #5/#6 the Solos, all six for Delta.
+const JD = [0, 1, 2, 3], J5 = [4], J6 = [5], J56 = [4, 5], JA = [0, 1, 2, 3, 4, 5];
+// Maneuvers (local frame: x along the show line → east, y up, z away from the crowd). Eastbound turns
+// away from the crowd are dir −1, westbound +1. form rows: [right, up, back, own roll].
 function maneuvers() {
   return [
-    {
-      name: 'Delta pass', call: 'Blue Angels Delta, six-ship, in from the east along the show line. Smoke on.',
-      groups: [{ craft: 'jet', form: DELTA, v: 165, path: makePath(V(7000, 140, 80), Wst, [['s', 14000]]) }],
-      smoke: (p) => Math.abs(p.x) < 3600,
-    },
-    {
-      name: 'Diamond 360', call: 'Diamond, four-ship, Diamond 360 — tight level turn over the box.',
-      groups: [{ craft: 'jet', form: DIAMOND, v: 160, path: makePath(V(-6500, 150, 0), E, [['s', 6500], ['t', 560, 360, 1], ['s', 6500]]) }],
-      smoke: (p) => Math.abs(p.x) < 1800 || p.z > 60,
-    },
-    {
-      name: 'Sneak pass', call: 'Number Five, sneak pass — low and fast from the west. Hold on to your hats.',
-      groups: [{ craft: 'jet', form: [[0, 0, 0]], v: 265, path: makePath(V(-9500, 35, 120), E, [['s', 19000]]) }],
-      smoke: () => false,
-    },
-    {
-      name: 'Opposing knife-edge', call: 'Solos, opposing knife-edge pass at show center.',
+    { name: 'Delta pass', call: 'Blue Angels Delta, six-ship, in from the east along the show line. Smoke on!',
+      groups: [{ jets: JA, form: DELTA, v: 165, path: makePath(V(IN, 140, 160), Wst, [['s', 2 * IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 2600 },
+    { name: 'Sneak pass', call: 'Number Five — sneak pass, from behind the crowd, just under the speed of sound.',
+      groups: [{ jets: J5, form: [[0, 0, 0]], v: 290, path: makePath(V(-IN - 2500, 28, 220), E, [['s', 2 * IN + 5000]]), vapor: (p) => Math.abs(p.x) < 900 }],
+      smoke: () => false },
+    { name: 'Diamond roll', call: 'Diamond, four-ship — Diamond Roll at show center.',
+      groups: [{ jets: JD, form: DIAMOND, v: 160, path: makePath(V(-IN, 170, 320), E, [['s', 2 * IN]]), roll: (p) => Math.PI * 2 * sm(ramp(p.x, -450, 450)) }],
+      smoke: (p) => Math.abs(p.x) < 2400 },
+    { name: 'Opposing knife-edge', call: 'Solos — opposing knife-edge pass. They close at over a thousand miles an hour.',
       groups: [
-        { craft: 'jet', form: [[0, 0, 0]], v: 190, path: makePath(V(-7000, 60, 20), E, [['s', 14000]]), roll: (p) => 90 * D2R * Math.max(0, 1 - Math.abs(p.x) / 700) },
-        { craft: 'jet', form: [[0, 0, 0]], v: 190, path: makePath(V(7000, 60, -20), Wst, [['s', 14000]]), roll: (p) => -90 * D2R * Math.max(0, 1 - Math.abs(p.x) / 700) },
-      ],
-      smoke: (p) => Math.abs(p.x) < 3000,
-    },
-    {
-      name: 'Diamond loop', call: 'Diamond, loop over show center. Smoke on.',
-      groups: [{ craft: 'jet', form: DIAMOND, v: 150, path: makePath(V(-6000, 160, 200), E, [['s', 6000], ['l', 720, 360], ['s', 6000]]) }],
-      smoke: (p) => Math.abs(p.x) < 2000 || p.y > 200,
-    },
-    {
-      name: 'Fat Albert', call: 'Fat Albert, the team\'s C-130J, low pass from the west.',
-      groups: [{ craft: 'c130', form: [[0, 0, 0]], v: 105, path: makePath(V(-6500, 90, 300), E, [['s', 5200], ['t', 900, 30, 1], ['t', 900, 30, -1], ['s', 6000]]) }],
-      smoke: () => false,
-    },
-    {
-      name: 'Delta break', call: 'Delta, line-abreast pass, then the Delta breakout.',
-      groups: DELTA.map((o, i) => ({ craft: 'jet', form: [[0, 0, 0]], v: 170, path: makePath(V(6500, 140 + o[1], 80 + o[0] * 1.2 + o[2] * 0.3), Wst, [['s', 6500 + o[2]], ['t', 1200, 45 + (i - 2.5) * 18, i % 2 ? 1 : -1], ['s', 6000]]) })),
-      smoke: (p) => Math.abs(p.x) < 3000,
-    },
+        { jets: J5, form: [[0, 0, 0]], v: 200, path: makePath(V(-IN, 60, 230), E, [['s', 2 * IN]]), roll: (p) => -Math.PI / 2 * sm(ramp(700 - Math.abs(p.x), 0, 500)) },
+        { jets: J6, form: [[0, 0, 0]], v: 200, path: makePath(V(IN, 60, 190), Wst, [['s', 2 * IN]]), roll: (p) => Math.PI / 2 * sm(ramp(700 - Math.abs(p.x), 0, 500)) },
+      ], smoke: (p) => Math.abs(p.x) < 2600 },
+    { name: 'Double Farvel', call: 'Diamond — Double Farvel: the Boss and the slot are flying upside down.',
+      groups: [{ jets: JD, form: [[0, 0, 0, Math.PI], [8, -1, 8], [-8, -1, 8], [0, -2, 16, Math.PI]], v: 150, path: makePath(V(IN, 150, 300), Wst, [['s', 2 * IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 2400 },
+    { name: 'Minimum radius turn', call: 'Number Six — minimum-radius turn, seven G, right in front of you.',
+      groups: [{ jets: J6, form: [[0, 0, 0]], v: 150, path: makePath(V(-IN, 110, 240), E, [['s', IN], ['t', 330, 360, -1], ['s', IN]]) }],
+      smoke: (p) => p.x > -300 && p.x < 300 },
+    { name: 'Diamond loop', call: 'Diamond — four-ship loop. Smoke on.',
+      groups: [{ jets: JD, form: DIAMOND, v: 150, path: makePath(V(-IN, 160, 320), E, [['s', IN], ['l', 720, 360], ['s', IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 2000 || p.y > 200 },
+    { name: 'Calypso pass', call: 'Solos — Calypso Pass: Five inverted, canopy to canopy above Six.',
+      groups: [{ jets: J56, form: [[0, 0, 0], [0, 7.5, 0, Math.PI]], v: 150, path: makePath(V(IN, 80, 230), Wst, [['s', 2 * IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 2200 },
+    { name: 'Line-abreast loop', call: 'Diamond — line-abreast loop, wingtip to wingtip.',
+      groups: [{ jets: JD, form: LINE4, v: 150, path: makePath(V(IN, 160, 340), Wst, [['s', IN], ['l', 700, 360], ['s', IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 2000 || p.y > 200 },
+    { name: 'Fortus', call: 'Number Six — the Fortus: low and slow, nose high, about one-two-five knots.',
+      groups: [{ jets: J6, form: [[0, 0, 0]], v: 68, path: makePath(V(-1700, 70, 230), E, [['s', 3400]]), pitch: () => 24 * D2R }],
+      smoke: () => false },
+    { name: 'Echelon parade', call: 'Delta, echelon parade — all six on the right wing, showing you their topsides.',
+      groups: [{ jets: JA, form: ECHELON, v: 135, path: makePath(V(IN, 130, 260), Wst, [['s', IN], ['t', 900, 120, 1], ['s', IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 2200 },
+    { name: 'Opposing aileron rolls', call: 'Solos — opposing aileron rolls through show center.',
+      groups: [
+        { jets: J5, form: [[0, 0, 0]], v: 190, path: makePath(V(-IN, 75, 240), E, [['s', 2 * IN]]), roll: (p) => Math.PI * 4 * sm(ramp(p.x, -800, 800)) },
+        { jets: J6, form: [[0, 0, 0]], v: 190, path: makePath(V(IN, 75, 200), Wst, [['s', 2 * IN]]), roll: (p) => -Math.PI * 4 * sm(ramp(-p.x, -800, 800)) },
+      ], smoke: (p) => Math.abs(p.x) < 2400 },
+    { name: 'Diamond 360', call: 'Diamond — Diamond 360, a tight level turn over the box.',
+      groups: [{ jets: JD, form: DIAMOND, v: 160, path: makePath(V(-IN, 150, 120), E, [['s', IN], ['t', 520, 360, -1], ['s', IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 1800 || p.z > 200 },
+    { name: 'Fat Albert', call: 'And here is Fat Albert, the team\'s C-130J — low pass from the west.',
+      groups: [{ craft: 'c130', form: [[0, 0, 0]], v: 105, path: makePath(V(-IN - 500, 90, 320), E, [['s', IN + 500], ['t', 900, 30, -1], ['t', 900, 30, 1], ['s', IN]]) }],
+      smoke: () => false },
+    { name: 'Delta loop', call: 'Delta — six-ship loop. Smoke on!',
+      groups: [{ jets: JA, form: DELTA, v: 150, path: makePath(V(-IN, 160, 340), E, [['s', IN], ['l', 760, 360], ['s', IN]]) }],
+      smoke: (p) => Math.abs(p.x) < 2000 || p.y > 200 },
+    { name: 'Delta breakout', call: 'Delta — the Delta Breakout! Six jets, six directions.',
+      groups: DELTA.map((o, i) => ({ jets: [i], form: [[0, 0, 0]], v: 170, path: makePath(V(IN + o[2], 150 + o[1], 300 + o[0] * 1.2), Wst, [['s', IN + o[2]], ['l', 700, 35 + i * 6], ['t', 1100, 25 + (i - 2.5) * 22, i % 2 ? 1 : -1], ['s', 4000]]) })),
+      smoke: (p) => Math.abs(p.x) < 3000 || p.y > 250 },
   ];
 }
 
@@ -209,24 +230,39 @@ function emitSmoke(p) {
   pos.needsUpdate = true; b.needsUpdate = true;
 }
 
-// ---------------------------------------------------------------- show state
-export const fw = { active: false, t: 0, idx: -1, gap: 6, man: null, list: null, jets: [], c130: null, extras: [] };
+// ---------------------------------------------------------------- show state & scheduler
+// Like the real demo, two things can be on stage at once: the Solos perform while the Diamond
+// repositions out of sight, so there's always something to watch. Each maneuver claims its jets.
+export const fw = { active: false, t: 0, next: 0, sinceStart: 99, list: null, running: [], jets: [], vapor: [], c130: null };
 function pool() {
   if (fw.jets.length) return;
   const base = buildHornet();
-  for (let i = 0; i < 6; i++) { const m = i ? base.clone() : base; m.visible = false; m.rotation.order = 'XYZ'; W.scene.add(m); fw.jets.push(m); }
+  const vg = new THREE.ConeGeometry(2.6, 7, 16, 1, true); vg.rotateX(-Math.PI / 2);          // transonic vapor cone
+  const vm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
+  for (let i = 0; i < 6; i++) {
+    const m = i ? base.clone() : base; m.visible = false; W.scene.add(m); fw.jets.push(m);
+    const v = new THREE.Mesh(vg, vm); v.position.z = 1.5; v.visible = false; m.add(v); fw.vapor.push(v);
+  }
   fw.c130 = buildFatAlbert(); fw.c130.visible = false; W.scene.add(fw.c130);
   initSmoke();
 }
-
+const usesOf = (m) => m.groups.flatMap(g => g.craft === 'c130' ? ['c130'] : g.jets);
+function startManeuver(m, t0 = 0) {
+  m.dur = Math.max(...m.groups.map(g => g.path.total / g.v)) + 1;
+  fw.running.push({ m, t: t0, uses: usesOf(m) });
+  fw.sinceStart = 0;
+  say('AIR', 'Air Boss', m.call);
+}
 export function startFleetWeek() {
   frame(); pool();
-  fw.active = true; fw.t = 0; fw.idx = -1; fw.gap = 8; fw.man = null; fw.list = maneuvers();
+  fw.active = true; fw.list = maneuvers(); fw.running = []; fw.next = 1; fw.sinceStart = 0;
   spawnFleet();
-  say('AIR', 'Air Boss', 'All stations, San Francisco Fleet Week. The aerobatic box off the Marina Green is HOT. Spectator vessels remain outside the yellow buoys. Coast Guard is enforcing.');
+  say('AIR', 'Air Boss', 'All stations, San Francisco Fleet Week. The aerobatic box off the Marina Green is HOT. Spectator vessels remain outside the yellow buoys.');
+  // open the show right away: the Delta is already inbound and reaches show center in ~6 s
+  startManeuver(fw.list[0], (IN - 1000) / 165);
 }
 export function stopFleetWeek() {
-  fw.active = false;
+  fw.active = false; fw.running = [];
   for (const j of fw.jets) j.visible = false;
   if (fw.c130) fw.c130.visible = false;
   jetAudio(0, 500, 0);
@@ -331,68 +367,70 @@ function memberState(g, k, tau, outPos, outMat) {
   _v.subVectors(_pb, _pa).divideScalar(0.12);                          // m/s (local)
   _a.copy(_pb).add(_pa).addScaledVector(_p, -2).divideScalar(0.06 * 0.06);
   _f.copy(_v).normalize();
-  // lift vector = centripetal accel + gravity reaction → "up" of the aircraft
+  // lift vector = centripetal accel + gravity reaction → "up" of the aircraft (bank & pitch follow the path)
   _u.copy(_a).addScaledVector(_f, -_a.dot(_f)); _u.y += 9.81; _u.normalize();
   _r.crossVectors(_f, _u).normalize(); _u.crossVectors(_r, _f).normalize();
   if (g.roll) { const rr = g.roll(_p); _q.setFromAxisAngle(_f, rr); _r.applyQuaternion(_q); _u.applyQuaternion(_q); }
   const o = g.form[k];
   _w.copy(_p).addScaledVector(_r, o[0]).addScaledVector(_u, o[1]).addScaledVector(_f, -o[2]);
-  // to world
   toWorld(_w, outPos);
-  const fw_ = dirToWorld(_f, _lw.set(0, 0, 0)).clone(), uw = dirToWorld(_u, new THREE.Vector3()), rw = dirToWorld(_r, new THREE.Vector3());
-  if (outMat) { outMat.makeBasis(rw, uw, fw_.clone().negate()); outMat.setPosition(outPos); }
-  return { fwd: fw_, vel: fw_.clone().multiplyScalar(g.v), local: _w };
+  const fw_ = dirToWorld(_f, new THREE.Vector3());
+  if (outMat) {
+    // the member's own attitude: formation roll + its own roll (inverted wingmen) + nose-high pitch
+    const f2 = _f.clone(), u2 = _u.clone(), r2 = _r.clone();
+    if (o[3]) { _q.setFromAxisAngle(f2, o[3]); u2.applyQuaternion(_q); r2.applyQuaternion(_q); }
+    if (g.pitch) { _q.setFromAxisAngle(r2, g.pitch(_p)); f2.applyQuaternion(_q); u2.applyQuaternion(_q); }
+    const fwv = dirToWorld(f2, new THREE.Vector3()), uw = dirToWorld(u2, new THREE.Vector3()), rw = dirToWorld(r2, new THREE.Vector3());
+    outMat.makeBasis(rw, uw, fwv.negate()); outMat.setPosition(outPos);
+  }
+  return { fwd: fw_, vel: fw_.clone().multiplyScalar(g.v), local: _w.clone() };
 }
 
 export function updateFleetWeek(dt, listener, camRight) {
   if (!fw.active) return;
-  fw.t += dt;
-  // schedule
-  if (!fw.man) {
-    fw.gap -= dt;
-    for (const j of fw.jets) j.visible = false; fw.c130.visible = false;
-    if (fw.gap <= 0) {
-      fw.idx = (fw.idx + 1) % fw.list.length; fw.man = fw.list[fw.idx]; fw.t = 0;
-      fw.man.dur = Math.max(...fw.man.groups.map(g => g.path.total / g.v)) + 2;
-      say('AIR', 'Air Boss', fw.man.call);
-    }
-    jetAudio(0, 400, 0);
-    smokeUniforms(dt);
-    return;
-  }
-  const man = fw.man;
-  if (fw.t > man.dur) { fw.man = null; fw.gap = rnd(10, 22); return; }
-  let ji = 0, I = 0, best = null, bestI = 0, prop = 0;
+  fw.sinceStart += dt;
+  // schedule: start the next maneuver once its jets are free and the last one has had the stage a bit
+  const busy = new Set(fw.running.flatMap(r => r.uses));
+  const nm = fw.list[fw.next];
+  if (fw.sinceStart > 9 && usesOf(nm).every(j => !busy.has(j))) { startManeuver(nm); fw.next = (fw.next + 1) % fw.list.length; }
+  for (const j of fw.jets) j.visible = false; fw.c130.visible = false;
+  for (const v of fw.vapor) v.visible = false;
+  let I = 0, best = null, bestI = 0;
   smokeT -= dt; const puff = smokeT <= 0; if (puff) smokeT = 0.014;
-  for (const g of man.groups) {
-    for (let k = 0; k < g.form.length; k++) {
-      const mesh = g.craft === 'c130' ? fw.c130 : fw.jets[ji++];
-      if (!mesh) continue;
-      const st = memberState(g, k, fw.t, mesh.position, _m);
-      mesh.quaternion.setFromRotationMatrix(_m); mesh.visible = true;
-      if (puff && man.smoke(st.local)) {
-        const tail = mesh.position.clone().addScaledVector(st.fwd, -9);
-        emitSmoke(tail);
+  for (const run of fw.running) {
+    run.t += dt;
+    const man = run.m;
+    for (const g of man.groups) {
+      for (let k = 0; k < g.form.length; k++) {
+        const ji = g.craft === 'c130' ? -1 : g.jets[k];
+        const mesh = ji < 0 ? fw.c130 : fw.jets[ji];
+        const st = memberState(g, k, run.t, mesh.position, _m);
+        mesh.quaternion.setFromRotationMatrix(_m); mesh.visible = true;
+        if (ji >= 0 && g.vapor && g.vapor(st.local)) fw.vapor[ji].visible = true;
+        if (puff && man.smoke(st.local)) emitSmoke(mesh.position.clone().addScaledVector(st.fwd, -9));
+        // sound: evaluate at the retarded time (the sound you hear left the jet d/c seconds ago)
+        let d = mesh.position.distanceTo(listener), tr = run.t - d / 343;
+        const pr = new THREE.Vector3(), sr = memberState(g, k, Math.max(0, tr), pr, null);
+        tr = run.t - pr.distanceTo(listener) / 343;
+        d = Math.max(25, pr.distanceTo(listener));
+        _cr.subVectors(listener, pr).normalize();
+        const rear = Math.max(0, -_cr.dot(sr.fwd));                        // exhaust side is loudest
+        const w = (ji < 0 ? 0.25 : 1) * (1 + 1.6 * rear) * (tr < 0 ? 0 : 1);
+        const ii = w * (200 / d) ** 2;
+        I += ii;
+        if (ii > bestI) { bestI = ii; best = { d, pr: pr.clone(), vrad: sr.vel.dot(_cr), c130: ji < 0 }; }
       }
-      // sound: evaluate at the retarded time (sound left the jet d/c seconds ago)
-      let d = mesh.position.distanceTo(listener), tr = fw.t - d / 343;
-      const pr = new THREE.Vector3(), sr = memberState(g, k, Math.max(0, tr), pr, null);
-      d = Math.max(30, pr.distanceTo(listener));
-      _cr.subVectors(listener, pr).normalize();
-      const rear = Math.max(0, -_cr.dot(sr.fwd));                        // exhaust side is loudest
-      const w = (g.craft === 'c130' ? 0.3 : 1) * (1 + 1.4 * rear) * (tr < 0 ? 0 : 1);
-      const ii = w * (300 / d) ** 2;
-      I += ii;
-      if (ii > bestI) { bestI = ii; best = { d, pr: pr.clone(), vrad: sr.vel.dot(_cr), c130: g.craft === 'c130' }; }
     }
   }
+  fw.running = fw.running.filter(r => r.t < r.m.dur);
   if (best) {
-    const level = 0.8 * Math.sqrt(I);
+    // amplitude ∝ 1/distance: a Hornet at ~200 m is the loudest thing in the bay (~120 dB)
+    const level = Math.sqrt(I);
     const dop = Math.max(0.5, Math.min(2.5, 343 / Math.max(80, 343 - best.vrad)));
-    const cutoff = (300 + 9000 * Math.exp(-best.d / 900)) * dop * (best.c130 ? 0.35 : 1);
+    const cutoff = (250 + 11000 * Math.exp(-best.d / 1100)) * dop * (best.c130 ? 0.35 : 1);
     const pan = camRight ? _cr.subVectors(best.pr, listener).normalize().dot(camRight) : 0;
-    jetAudio(level, cutoff, pan, best.c130 ? 1.2 : 0.5);
-  }
+    jetAudio(level, cutoff, pan, best.c130 ? 1.4 : 0.8);
+  } else jetAudio(0, 400, 0);
   smokeUniforms(dt);
 }
 function smokeUniforms() {
