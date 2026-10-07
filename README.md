@@ -6,6 +6,10 @@ The game opens already underway off Sausalito at golden hour, with the main menu
 
 ## Run it
 
+**Play online:** https://kevinniechen.github.io/sf-bay-boating-trainer/ (add `?mute` to start silent)
+
+To run it locally:
+
 ```bash
 python3 serve.py          # then open http://localhost:8765
 ```
