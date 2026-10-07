@@ -28,10 +28,9 @@ const G = 9.81;
 // x → starboard, z → aft, y up from the cockpit sole). Rails/gunwales are low: momentum can carry you over.
 const DECK = { x0: -1.0, x1: 1.0, z0: -0.95, z1: 4.0, cabinZ: 1.25, floorY: 0.41 };
 const OBST = [[-0.45, 0.45, 0.32], [0.45, 0.45, 0.32], [-0.95, 2.6, 0.26], [0.95, 2.6, 0.26]];
-const SEATS = [
-  { x: -0.45, z: 0.45, yaw: 0 }, { x: -0.95, z: 2.6, yaw: -Math.PI / 2 }, { x: 0.95, z: 2.6, yaw: Math.PI / 2 },
-  { x: -0.7, z: 3.95, yaw: 0 }, { x: 0, z: 3.95, yaw: 0 }, { x: 0.7, z: 3.95, yaw: 0 },
-];
+// passengers sit only on the aft bench (three places, facing forward); the helm bolsters are the
+// crew's and the little side pads aren't seats — when the bench is full you hold on instead
+const SEATS = [{ x: -0.72, z: 4.08, yaw: 0 }, { x: 0, z: 4.08, yaw: 0 }, { x: 0.72, z: 4.08, yaw: 0 }];
 const RAILS = [];
 for (const z of [1.6, 2.1, 3.1, 3.6]) for (const s of [-1, 1]) RAILS.push({ x: s * 0.9, z, yaw: s * Math.PI / 2, side: s });
 const HELM = { x: 0.45, z: 0.2 };
@@ -146,8 +145,7 @@ export function initCrew(player, n = 4) {
   const cap = new Person(0, true); cap.x = HELM.x; cap.z = HELM.z; crew.people.push(cap);
   for (let i = 0; i < n; i++) {
     const p = new Person(i + 1);
-    const spot = SEATS[(i + 1) % SEATS.length];
-    p.x = spot.x + rnd(-0.1, 0.1); p.z = Math.min(DECK.z1 - 0.3, spot.z + rnd(-0.6, 0.2)); p.yaw = rnd(-1, 1);
+    p.x = [-0.6, 0.6, -0.3, 0.4][i % 4] + rnd(-0.1, 0.1); p.z = [1.8, 2.2, 3.1, 3.4][i % 4] + rnd(-0.1, 0.1); p.yaw = rnd(-1, 1);
     crew.people.push(p);
   }
   for (const p of crew.people) {
@@ -292,7 +290,8 @@ function edges(p, player) {
       p.x = s * xlim; if (out > 0) { p.vx *= -0.3; if (out > 1.2) { p.balance -= out * 0.25; p.d.fear += 0.1; } }
     }
   }
-  if (p.z > DECK.z1) { if (p.vz > 3.2 && !p.captain) { goOverboard(p, player, 0); return; } p.z = DECK.z1; if (p.vz > 0) p.vz *= -0.3; }
+  const zmax = p.posture === 'sit' || (p.seat && p.goal === p.seat) ? 4.1 : DECK.z1;
+  if (p.z > zmax) { if (p.vz > 3.2 && !p.captain) { goOverboard(p, player, 0); return; } p.z = zmax; if (p.vz > 0) p.vz *= -0.3; }
   if (p.z < DECK.z0) { p.z = DECK.z0; if (p.vz < 0) { p.balance -= -p.vz * 0.3; p.vz *= -0.3; } }
 }
 
