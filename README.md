@@ -168,6 +168,17 @@ The UI is styled after simulators such as Arma 3 and Euro Truck Simulator 2: fla
   - **Perception:** they notice landmarks, tall buildings, nearby boats, jets and the sunset, remember what they've already seen, and look at things with their head tilted to the real height.
   - **Choices:** a utility system picks between wandering, looking, pointing (which makes others look), chatting, sitting, holding on, being sick over the rail, and cheering.
   - **Results:** a hard turn at speed can send someone sliding over the low cockpit gunwale. That raises a man-overboard alarm, and you can stop alongside to pick them up.
+- **Crew habits:** passengers sit on the aft bench as their home base. Once the boat is up on plane they stay seated with a hand on the grab rail. At idle or drifting they get up, go to the rail, wander and chat. They take photos of landmarks and sunsets and wave at boats passing close, both from the bench. The seasick go to the rail and stare at the horizon.
+- **A living bay** (more going on than a real Saturday):
+  - **Humpback whale:** a huge one (about 19 m). It blows, rolls, shows its flukes and sometimes breaches. It comes over to an idling boat, dives if you blast past, and it's solid.
+  - **Sharks:** fins patrol, then circle anyone who ends up in the water.
+  - **Escape from Alcatraz swim:** a start ferry off the island, swimmers jumping in, a stream of swimmers heading to the Marina, plus paddleboard and kayak escorts and safety RIBs. It runs in daylight.
+  - **Banner planes:** two planes tow MONACO.COM banners along circuits that drift over to wherever you are.
+  - **Pier 39 sea lions:** the K-dock colony basks, barks and flops, and slides into the water if you roar past.
+  - **Birds:** brown pelicans fly in lines and plunge-dive, and gulls hover over your wake.
+  - **Dolphins and porpoises:** dolphins sometimes come and ride your bow wave, and porpoises surface off the Gate.
+  - **Kiteboarders:** more of them, out from about 8 kn of wind, with jumps and spins.
+  - **Crew reactions:** the crew notices all of it. A whale or bow-riding dolphins will bring everyone up to look.
 - **Collisions:** the boat's motion is sub-stepped so it can't tunnel through small boats or pilings, and smaller boats you hit get shoved aside.
   - A hard impact can knock out an engine.
   - A violent one (about 15 kn into land or a pier, or a big ship) destroys the boat: a fireball, debris that floats and then sinks, and everyone ends up in the water. Press `R` to try again.

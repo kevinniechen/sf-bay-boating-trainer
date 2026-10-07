@@ -4,6 +4,7 @@ import { buildGeo, loadDEM, ll, toLL, noWakeZoneAt, shipLaneAt, depthAt, HAZARDS
 import { initWakes, updateWakes } from './wake.js';
 import { initCrew, updateCrew, crew, ejectAll } from './crew.js';
 import { explode, updateWreck, clearWreck } from './wreck.js';
+import { startLife, updateLife, life } from './life.js';
 import { startFleetWeek, stopFleetWeek, updateFleetWeek } from './fleetweek.js';
 import { env, buildCurrents, buildWind, updateChop, advanceEnv, advanceClock, setTidePreset, currentAt, windAt, KN, chopAt, tideCurrentFactor, baseWindKn } from './env.js';
 import { buildDocks, indexStructs, SITES, PRACTICE_STARTS, PLAYER_SLIP, nearestSite, GUEST_SPOTS, NAV_AIDS } from './docks.js';
@@ -72,6 +73,9 @@ async function boot() {
   };
   crew.hooks.recovered = (p) => { toast(`${p.name} is back aboard. Everyone's shaken — take it easy.`, 'ok', 5000); setDest(null); };
   player._ai = traffic.vessels;
+  player._extra = life.solid;   // the whale is solid when it's at the surface
+  life.onBreach = (w) => { if (Math.hypot(w.x - player.x, w.z - player.z) < 1500) toast('A humpback whale just BREACHED!', 'info', 4000); };
+  life.onDolphins = () => toast('Dolphins are riding your bow wave!', 'ok', 4000);
   G.player = player;
   initLights();
   runner = new Runner(G);
@@ -124,6 +128,7 @@ Object.assign(G, {
     if (e.daySpeed != null) env.daySpeed = e.daySpeed;
     spawnTraffic(e.traffic === 'fleetweek' ? 'typical' : e.traffic || 'typical');
     if (e.traffic === 'fleetweek') startFleetWeek();
+    startLife({ race: e.traffic !== 'none' && e.traffic !== 'fleetweek' });
     radio.log.length = 0;
     weather();
   },
@@ -923,6 +928,7 @@ function frame(now) {
   if (window.__camLook) { const L = window.__camLook(); if (L) { W.camera.fov = L.fov || W.camera.fov; W.camera.updateProjectionMatrix(); W.camera.lookAt(L.x, L.y, L.z); } }   // debug/screenshot hook
   if (!paused && !hud.chartOpen) updateFleetWeek(active ? rdt * timeScale : rdt, W.camera.position, _camR.set(1, 0, 0).applyQuaternion(W.camera.quaternion));
   updateWakes(player, traffic.vessels, W.camera.position);
+  if (!paused && !hud.chartOpen) updateLife(active ? rdt * timeScale : rdt, player);
   if (!paused && !hud.chartOpen) { updateCrew(active || mode === 'tour' ? rdt * (active ? timeScale : 1) : 0, player, { camMode }); updateWreck(rdt); }
   updateWorld(rdt, player, {});
   arrowT -= rdt;

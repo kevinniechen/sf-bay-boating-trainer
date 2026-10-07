@@ -355,7 +355,7 @@ export class PlayerBoat {
         if (hit) this.resolve(cx, cz, hit.nx, hit.nz, hit.depth, 0, 0, st.kind, st);
       }
     }
-    if (aiVessels) for (const v of aiVessels) {
+    if (aiVessels) for (const v of (this._extra && this._extra.length ? [...aiVessels, ...this._extra] : aiVessels)) {
       if (!v.active || v.noCollide) continue;
       const dx = v.x - this.x, dz = v.z - this.z, rr = v.len / 2 + 6;
       if (dx * dx + dz * dz > rr * rr) continue;

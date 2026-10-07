@@ -356,7 +356,7 @@ function spawnSmall() {
   }
   // kiteboarders & windsurfers off Crissy Field
   const kz = P(37.8115, -122.4615);
-  for (let i = 0; i < Math.round(10 * density); i++) {
+  for (let i = 0; i < Math.round(18 * Math.max(0.6, density)); i++) {
     const p = randomWaterPoint(kz.x, kz.z, 650, -40, 2);
     if (!p) continue;
     const k = buildKiter();
@@ -500,7 +500,7 @@ function behave(v, dt, T) {
     }
     case 'kiter': {
       const wind = baseWindKn(env.clock);
-      if (wind < 11) { v.mesh.visible = false; v.targetSpeed = 0; v.noCollide = true; break; }
+      if (wind < 8) { v.mesh.visible = false; v.targetSpeed = 0; v.noCollide = true; break; }
       v.mesh.visible = true; v.noCollide = false;
       const from = env.windDirFrom * D2R;
       v.desH = from + v.dir * 100 * D2R;
@@ -508,6 +508,10 @@ function behave(v, dt, T) {
       const look = { x: v.x + Math.sin(v.h) * 60, z: v.z - Math.cos(v.h) * 60 };
       if ((d > v.zone.r && Math.cos(steerTo(v, v.zone.x, v.zone.z) - v.h) < 0) || sdfAt(look.x, look.z) > -25 || v.timer <= 0) { v.dir *= -1; v.timer = rnd(25, 70); }
       v.targetSpeed = v.maxSpeed;
+      // jumps: the kite yanks them up 4–8 m, a spin in the air, a splashy landing
+      v.jumpT = (v.jumpT ?? rnd(5, 20)) - dt;
+      if (v.jumpT <= 0 && !v.air) { v.airV = rnd(6, 10); v.air = 0.01; v.jumpT = rnd(8, 25); v.spin = Math.random() < 0.4 ? (Math.random() < 0.5 ? -1 : 1) : 0; }
+      if (v.air) { v.airV -= 6.5 * dt; v.air += v.airV * dt; if (v.air <= 0) { v.air = 0; emitFoam(v.x, v.z, 0, 0, 2.5, 4, 0); } }
       break;
     }
     case 'jetski': {
@@ -717,6 +721,7 @@ function render(v, dt, camPos) {
     const arr = v.kline.geometry.attributes.position.array;
     arr[0] = 0; arr[1] = 1.2; arr[2] = 0; arr[3] = lxl; arr[4] = 16; arr[5] = lzl; v.kline.geometry.attributes.position.needsUpdate = true;
     m.rotation.z = -v.dir * 0.4 + roll;
+    if (v.air) { m.position.y += v.air; m.rotation.y += (v.spin || 0) * Math.min(1, v.air / 3) * Math.PI * 2 * (1 - Math.max(0, v.airV) / 10); }
   } else m.rotation.z = roll + Math.max(-0.12, Math.min(0.12, (v.avoidH || 0) * 0.1));
   if (v.hawserLine) {
     const tug = v.follower, arr = v.hawserLine.geometry.attributes.position.array;

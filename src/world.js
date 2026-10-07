@@ -1206,11 +1206,7 @@ function buildMooredBoats() {
     free.forEach((m, i) => { m4.makeTranslation(m.x, 0, m.z); im.setMatrixAt(i, m4); });
     W.scene.add(im);
   }
-  // sea lions
-  const sl = buildSeaLion().geometry;
-  const im = new THREE.InstancedMesh(sl, MAT.vc, SEA_LIONS.length);
-  SEA_LIONS.forEach((p2, i) => { m4.compose(p.set(p2.x, 0.4, p2.z), q.setFromAxisAngle(up, Math.random() * 6.28), s.set(1, 1, 1)); im.setMatrixAt(i, m4); });
-  W.scene.add(im);
+  // sea lions: animated colony in life.js
 }
 
 function buildNavAids() {

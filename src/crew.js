@@ -18,6 +18,7 @@ import { env, sunPosition, KN } from './env.js';
 import { W } from './world.js';
 import { traffic, makeScripted } from './traffic.js';
 import { fw } from './fleetweek.js';
+import { life } from './life.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -30,7 +31,7 @@ const DECK = { x0: -1.0, x1: 1.0, z0: -0.95, z1: 4.0, cabinZ: 1.25, floorY: 0.41
 const OBST = [[-0.45, 0.45, 0.32], [0.45, 0.45, 0.32], [-0.95, 2.6, 0.26], [0.95, 2.6, 0.26]];
 // passengers sit only on the aft bench (three places, facing forward); the helm bolsters are the
 // crew's and the little side pads aren't seats — when the bench is full you hold on instead
-const SEATS = [{ x: -0.72, z: 4.08, yaw: 0 }, { x: 0, z: 4.08, yaw: 0 }, { x: 0.72, z: 4.08, yaw: 0 }];
+const SEATS = [{ x: -0.84, z: 4.08, yaw: 0 }, { x: -0.28, z: 4.08, yaw: 0 }, { x: 0.28, z: 4.08, yaw: 0 }, { x: 0.84, z: 4.08, yaw: 0 }];
 const RAILS = [];
 for (const z of [1.6, 2.1, 3.1, 3.6]) for (const s of [-1, 1]) RAILS.push({ x: s * 0.9, z, yaw: s * Math.PI / 2, side: s });
 const HELM = { x: 0.45, z: 0.2 };
@@ -85,6 +86,7 @@ function buildPerson(p) {
     return g;
   };
   const parts = { root, hips, torso, neck, armL: arm(-1), armR: arm(1), legL: leg(-1), legR: leg(1) };
+  const phone = box(0.07 * s, 0.13 * s, 0.015, '#111', -0.62 * s); phone.position.z = -0.05; phone.visible = false; parts.armR.add(phone); parts.phone = phone;
   return parts;
 }
 
@@ -145,7 +147,7 @@ export function initCrew(player, n = 4) {
   const cap = new Person(0, true); cap.x = HELM.x; cap.z = HELM.z; crew.people.push(cap);
   for (let i = 0; i < n; i++) {
     const p = new Person(i + 1);
-    p.x = [-0.6, 0.6, -0.3, 0.4][i % 4] + rnd(-0.1, 0.1); p.z = [1.8, 2.2, 3.1, 3.4][i % 4] + rnd(-0.1, 0.1); p.yaw = rnd(-1, 1);
+    const st = SEATS[i % SEATS.length]; p.x = st.x; p.z = st.z; p.yaw = 0; p.seat = st; p.posture = 'sit'; p.act = { type: 'sit', t: 0 };
     crew.people.push(p);
   }
   for (const p of crew.people) {
@@ -188,6 +190,7 @@ function gatherPOIs(player, t) {
     pois.push({ id: 'sun', name: env.clock > 12 ? 'the sunset' : 'the sunrise', x: px + Math.sin(sp.az) * 4000, z: pz - Math.cos(sp.az) * 4000, y: Math.tan(sp.alt) * 4000, sal: 2.2, kind: 'sun' });
   }
   if (player.sogKn > 18) pois.push({ id: 'wake', name: 'our wake', x: px - player.fwd.x * 60, z: pz - player.fwd.z * 60, y: 0, sal: 0.6, kind: 'wake' });
+  for (const q of life.pois) if (Math.hypot(q.x - px, q.z - pz) < Math.min(vis, 5000)) pois.push({ ...q, sal: q.sal * clamp(900 / (Math.hypot(q.x - px, q.z - pz) + 150), 0.25, 2) });
   for (const q of crew.people) if (!q.overboard) pois.push({ id: 'p:' + q.name, name: q.name, who: q, x: 0, z: 0, y: 0, sal: 0.35, kind: 'person' });
   crew.pois = pois;
 }
@@ -214,7 +217,7 @@ export function updateCrew(dt, player, opts = {}) {
   const Jx = -dv, Jz = du;
   const roll = player.roll + player.oscR, pitch = player.pitch + player.oscP;
   const gx = G * Math.sin(roll), gz = G * Math.sin(pitch);       // heel / bow-up slide
-  const kn = player.sogKn;
+  const kn = player.sogKn; crew.kn = kn;
   const crowdFear = crew.people.reduce((a, q) => a + (q.overboard ? 0 : q.d.fear), 0) / Math.max(1, crew.people.length);
   for (const p of crew.people) {
     if (p.overboard) { overboardUpdate(p, dt, player); continue; }
@@ -238,10 +241,11 @@ export function updateCrew(dt, player, opts = {}) {
     // ---- drives
     const motion = im + Math.abs(aY) * 0.6;
     const speedFear = Math.max(0, kn - (18 + 30 * p.tr.brave)) * 0.012;
-    p.d.fear = clamp(p.d.fear + (Math.max(0, motion - (3 + 5 * p.tr.brave)) * 0.05 + speedFear + (crowdFear - p.d.fear) * 0.1 * p.tr.social - 0.05) * dt, 0, 1.5);
+    const scary = crew.pois.some(q => q.scary && Math.hypot(q.x - player.x, q.z - player.z) < 40) ? 0.08 * (1 - p.tr.brave) : 0;
+    p.d.fear = clamp(p.d.fear + (Math.max(0, motion - (3 + 5 * p.tr.brave)) * 0.05 + speedFear + scary + (crowdFear - p.d.fear) * 0.1 * p.tr.social - 0.05) * dt, 0, 1.5);
     p.d.nausea = clamp(p.d.nausea + (p.tr.queasy * (Math.abs(aY) * 0.012 + Math.abs(player.oscR) * 0.6 + (kn < 6 ? Math.abs(roll) * 0.25 : 0)) - 0.006) * dt, 0, 1.2);
     p.d.thrill = clamp(p.d.thrill + ((kn > 28 ? (kn - 28) * 0.01 : -0.04) * p.tr.brave + (crew.pois.some(q => q.loud) ? 0.15 * p.tr.brave : 0)) * dt, 0, 1);
-    p.d.boredom = clamp(p.d.boredom + (0.012 - (p.att ? 0.02 * Math.min(1, p.att.sal) : 0)) * dt, 0, 1);
+    p.d.boredom = clamp(p.d.boredom + (0.008 - (p.att ? 0.012 * Math.min(1, p.att.sal) : 0) - (p.posture !== 'sit' ? 0.01 : 0)) * dt, 0, 1);
     p.d.fatigue = clamp(p.d.fatigue + (p.posture === 'stand' ? 0.004 : -0.01) * dt, 0, 1);
     for (const [k, v] of p.boost) { const nv = v - dt * 0.4; if (nv <= 0) p.boost.delete(k); else p.boost.set(k, nv); }
     p.barkT -= dt;
@@ -312,35 +316,54 @@ function think(p, t, kn, felt, player) {
   const cur = p.act.type;
   const others = crew.people.filter(q => q !== p && !q.overboard && q.posture !== 'fallen');
   const near = others.filter(q => Math.hypot(q.x - p.x, q.z - p.z) < 2.6);
+  const under = clamp((kn - 8) / 10, 0, 1);   // 0 drifting/idle … 1 up on plane
   const scared = D.fear + (felt > 4 ? 0.3 : 0) + (kn > 30 ? (kn - 30) * 0.02 * (1 - T.brave) : 0);
   const opts = p.captain ? [
     ['look', ps * 0.6 + 0.1, poi],
     ['ahead', 0.6 + kn * 0.03, null],
   ] : [
-    ['sit', scared * 1.3 + D.fatigue * 0.6 + D.nausea * 0.3 - D.boredom * 0.3, null],
-    ['hold', scared * 1.0 + felt * 0.05, null],
+    // like real passengers: the bench is home. From it they look around (head turns toward whatever is
+    // interesting, incl. each other); only something big, seasickness or restlessness gets them up.
+    // What passengers really do: once the boat is up on plane they stay seated and hold on (walking
+    // around at speed is how people get hurt); at idle or drifting they get up, go to the rail, wander,
+    // chat. Any time: take photos of landmarks and sunsets, wave at boats passing close, and the
+    // seasick head for the rail and stare at the horizon.
+    ['sit', 0.55 + under * 1.6 + scared * 1.3 + D.fatigue * 0.5 + D.nausea * 0.3 - D.boredom * 0.6 * (1 - under), poi],
+    ['hold', scared * 1.0 + felt * 0.05 - 0.7, null],
     ['sick', D.nausea > 0.85 ? 3 : D.nausea > 0.6 ? D.nausea : 0, null],
-    ['look', ps * (1 - scared * 0.5) * (0.5 + T.curious * 0.5), poi],
-    ['point', poi && ps > 1.6 && near.length && poi.kind !== 'person' ? ps * 0.55 * T.social : 0, poi],
-    ['chat', near.length ? T.social * (0.3 + D.boredom) * (1 - scared) : 0, near[0]],
-    ['cheer', D.thrill * T.brave * 1.4, poi],
-    ['wander', D.boredom * 0.7 * (1 - scared), null],
+    ['look', (ps - 0.9 + (1 - under) * 0.25) * (1 - scared * 0.6) * (0.5 + T.curious * 0.6) * (1 - 0.85 * under), poi],
+    ['point', poi && ps > 2.2 && near.length && poi.kind !== 'person' ? (ps - 1.2) * 0.5 * T.social * (1 - 0.85 * under) : 0, poi],
+    ['photo', poi && poi.kind !== 'person' && poi.kind !== 'wake' ? (ps - 0.6) * T.curious * 0.9 * (1 - scared * 0.7) : 0, poi],
+    ['wave', poi && poi.kind === 'vessel' && poi.close ? 1.1 + T.social * 0.6 : 0, poi],
+    ['chat', near.length ? T.social * D.boredom * 0.6 * (1 - scared) * (1 - under) - 0.3 : 0, near[0]],
+    ['cheer', D.thrill * T.brave * 1.2 - 0.2, poi],
+    ['wander', (D.boredom - 0.35) * 1.2 * (1 - scared) * (1 - 0.9 * under), null],
   ];
+  // gestures (photo, wave, cheer) layer on top of sitting: a seated person can snap a photo or wave
+  // without getting up, so they compete against a threshold rather than against the seat
+  if (!p.captain && p.posture === 'sit' && cur === 'sit') {
+    const g = opts.filter(o => GESTURES.includes(o[0])).sort((a, b) => b[1] - a[1])[0];
+    if (g && g[1] > 0.35 + rnd(0, 0.5)) { setAction(p, g[0], g[2], player); return; }
+  }
   let best = opts[0];
   for (const o of opts) { const sc = o[1] + (o[0] === cur ? 0.25 : 0) + rnd(0, 0.08); if (sc > best[1] + (best[0] === cur ? 0.25 : 0)) best = o; }
   const [type, , tgt] = best;
+  if (type === cur && type === 'sit' && p.seat) { if (tgt !== p.att) { p.att = tgt; if (tgt) p.mem.set(tgt.id, env.time); } return; }   // stay seated, just look elsewhere
   if (type === cur && (type !== 'look' || tgt === p.att)) return;
   setAction(p, type, tgt, player);
 }
+const GESTURES = ['photo', 'wave', 'cheer'];
 function setAction(p, type, tgt, player) {
   const prev = p.act.type;
-  p.act = { type, t: 0, tgt };
+  p.act = { type, t: 0, tgt, dur: rnd(3, 6) };
+  // photos, waving and cheering happen wherever you are — sitting people stay sitting
+  if (GESTURES.includes(type) && p.posture === 'sit' && p.seat) { p.att = tgt; if (tgt) p.mem.set(tgt.id, env.time); p.act.seated = true; return; }
   if (type !== 'sit') p.seat = null;
   if (type !== 'hold' && type !== 'sick') p.rail = null;
   p.goal = null;
   if (p.posture !== 'fallen') p.posture = 'stand';
   switch (type) {
-    case 'sit': p.seat = freeSeat(p); if (p.seat) p.goal = p.seat; else { p.act.type = 'hold'; p.rail = freeRail(p); p.goal = p.rail; } if (p.d.fear > 0.6) p.say(pick(['Slow down!!', 'I need to sit…', 'Okay okay okay', 'Is this safe?!'])); break;
+    case 'sit': p.att = tgt; if (tgt) p.mem.set(tgt.id, env.time); p.seat = freeSeat(p); if (p.seat) p.goal = p.seat; else { p.act.type = 'hold'; p.rail = freeRail(p); p.goal = p.rail; } if (p.d.fear > 0.6) p.say(pick(['Slow down!!', 'I need to sit…', 'Okay okay okay', 'Is this safe?!'])); break;
     case 'hold': p.rail = freeRail(p); p.goal = p.rail; break;
     case 'sick': {
       // the downwind side, ideally — but whichever rail is free and close will do
@@ -353,6 +376,7 @@ function setAction(p, type, tgt, player) {
       for (const q of crew.people) if (q !== p && Math.hypot(q.x - p.x, q.z - p.z) < 3.5) { q.boost.set(tgt.id, 2.5 * (0.5 + q.tr.social)); q.thinkT = Math.min(q.thinkT, rnd(0.2, 0.8)); }
       break;
     case 'chat': p.att = { id: 'p:' + tgt.name, who: tgt, name: tgt.name, kind: 'person', sal: 0.5 }; if (Math.random() < 0.4) p.say(pick(['Did you see that?', 'This is amazing', 'Where are we headed?', 'I could live out here', 'Is that Alcatraz?', 'brrr, it\'s windy', 'Best day ever'])); tgt.boost.set('p:' + p.name, 1.2); break;
+    case 'photo': case 'wave': p.att = tgt; if (tgt) p.mem.set(tgt.id, env.time); break;
     case 'cheer': p.att = tgt; p.say(pick(['WOOHOO!', 'Faster!!', 'YEAH!', 'Let\'s gooo', 'Wheee!']), true); break;
     case 'wander': p.goal = { x: rnd(-0.8, 0.8), z: rnd(1.5, 3.7) }; break;
     case 'ahead': p.att = null; break;
@@ -372,6 +396,7 @@ function remark(poi) {
 }
 function actUpdate(p, dt, t) {
   const a = p.act; a.t += dt;
+  if (GESTURES.includes(a.type) && a.t > a.dur) { p.act = { type: a.seated ? 'sit' : 'idle', t: 0 }; p.thinkT = 0; if (a.tgt) p.mem.set(a.tgt.id, env.time); }
   if (p.goal && Math.hypot(p.goal.x - p.x, p.goal.z - p.z) < 0.1) {
     if (a.type === 'sit' && p.seat) p.posture = 'sit';
     else if ((a.type === 'hold' || a.type === 'look') && p.rail) p.posture = 'hold';
@@ -436,7 +461,7 @@ function pose(p, dt, player, opts) {
   updateSplashes(dt / Math.max(1, crew.people.length));
   // attention → where the head (and body) points; heads tilt UP to the actual height of the building/jet
   let lookYaw = null, lookPitch = 0;
-  const tg = p.act.type === 'ahead' ? null : p.att;
+  const tg = p.act.type === 'ahead' || p.act.type === 'sick' ? null : p.att;
   if (tg) {
     if (tg.who) { lookYaw = Math.atan2(tg.who.x - p.x, -(tg.who.z - p.z)); lookPitch = 0; }
     else {
@@ -455,14 +480,16 @@ function pose(p, dt, player, opts) {
   p.yaw += dy * Math.min(1, dt * 3);
   // head: the remainder (clamped to a human neck)
   const hy = lookYaw == null ? Math.sin(env.time * 0.3 + p.scale * 9) * 0.25 : clamp(Math.atan2(Math.sin(lookYaw - p.yaw), Math.cos(lookYaw - p.yaw)), -1.4, 1.4);
-  const hp = clamp(lookPitch, -0.6, 1.1);
+  const hp = p.act.type === 'sick' && p.posture !== 'lean' ? 0 : clamp(lookPitch, -0.6, 1.1);
   P.hy += (hy - P.hy) * k; P.hp += (hp - P.hp) * k;
   // body targets
   const sitting = p.posture === 'sit', fallen = p.posture === 'fallen', lean = p.posture === 'lean', hold = p.posture === 'hold';
   P.sit += ((sitting ? 1 : 0) - P.sit) * k;
   P.fallen += ((fallen ? 1 : 0) - P.fallen) * Math.min(1, dt * 8);
   P.vomit += ((lean ? 1 : 0) - P.vomit) * k;
-  P.hold += ((hold || (sitting && p.d.fear > 0.6) ? 1 : 0) - P.hold) * k;
+  P.hold += ((hold || (sitting && (p.d.fear > 0.6 || crew.kn > 15)) ? 1 : 0) - P.hold) * k;
+  P.photo = (P.photo || 0) + ((p.act.type === 'photo' ? 1 : 0) - (P.photo || 0)) * k;
+  P.wave = (P.wave || 0) + ((p.act.type === 'wave' ? 1 : 0) - (P.wave || 0)) * k;
   P.cheer += ((p.act.type === 'cheer' ? 1 : 0) - P.cheer) * k;
   P.point += ((p.act.type === 'point' && p.act.t < 3 ? 1 : 0) - P.point) * k;
   P.walk += ((p.walking ? 1 : 0) - P.walk) * k;
@@ -471,15 +498,18 @@ function pose(p, dt, player, opts) {
   const fx = (p.felt || 0) > 0.5 ? clamp(-p.vx * 0.15, -0.5, 0.5) : 0;
   P.tx += ((clamp(-(crew.prev ? 0 : 0) + fx + Math.sin(env.time * 1.7 + p.scale * 5) * 0.02, -0.6, 0.6)) - P.tx) * k;
   const root = m.root;
-  root.position.set(p.x, p.y + (1 - P.sit) * 0 - P.sit * 0.36 * p.scale - P.fallen * 0.7 * p.scale, p.z);
-  root.rotation.set(P.fallen * 1.35, -p.yaw, 0, 'YXZ');
-  m.torso.rotation.set(-P.vomit * 1.0 - P.sit * 0.08 + P.cheer * 0.1, 0, P.tx);
+  // knocked down = slumped onto the deck (legs out, leaning back) — never a flat body poking through the hull
+  root.position.set(p.x, p.y - P.sit * 0.36 * p.scale - P.fallen * 0.8 * p.scale, p.z);
+  root.rotation.set(0, -p.yaw, 0, 'YXZ');
+  m.torso.rotation.set(-P.vomit * 1.0 - P.sit * 0.08 + P.cheer * 0.1 + P.fallen * 0.35, 0, P.tx);
   m.neck.rotation.set(P.hp - P.vomit * 0.4, -P.hy, 0, 'YXZ');
   const sw = Math.sin(P.phase) * 0.5 * P.walk;
-  m.legL.rotation.x = sw + P.sit * 1.45; m.legR.rotation.x = -sw + P.sit * 1.45;
-  m.armL.rotation.set(-sw * 0.8 + P.cheer * 2.9 - P.hold * 1.0, 0, -P.hold * 0.6 - P.cheer * 0.3);
+  const legUp = Math.max(P.sit, P.fallen) * 1.45;
+  m.legL.rotation.x = sw + legUp; m.legR.rotation.x = -sw + legUp + P.fallen * 0.2;
+  m.armL.rotation.set(-sw * 0.8 + P.cheer * 2.9 - P.hold * 1.0 + P.photo * 1.2 - P.fallen * 0.6, 0, -P.hold * 0.6 - P.cheer * 0.3);
   // pointing arm aims along the look direction
-  m.armR.rotation.set(sw * 0.8 + P.cheer * 2.9 + P.point * (1.6 + P.hp), P.point * -P.hy * 0.6, P.cheer * 0.3);
+  m.armR.rotation.set(sw * 0.8 + P.cheer * 2.9 + P.point * (1.6 + P.hp) + P.photo * (1.35 + P.hp * 0.5) + P.wave * 2.7 - P.fallen * 0.6, P.point * -P.hy * 0.6 + P.photo * -P.hy * 0.5, P.cheer * 0.3 + P.wave * (0.35 * Math.sin(env.time * 9) + 0.2));
+  if (m.phone) m.phone.visible = P.photo > 0.3;
   // first-person view is the captain's eyes: don't draw him inside the camera
   root.visible = !(p.captain && opts.camMode === 'helm');
 }
